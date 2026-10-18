@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to experiment</a>
   <div class="app-layout">
     <!-- Top Navigation Bar -->
     <header class="topbar">
@@ -34,7 +35,7 @@
 
     <div class="workspace">
       <!-- Sidebar Navigation -->
-      <aside class="sidebar">
+      <aside class="sidebar" aria-label="Learning modules">
         <div class="nav-section">
           <div class="section-title">1. RUNTIME & SYSTEMS</div>
           <button class="nav-item active" data-exp="event-loop">
@@ -102,7 +103,7 @@
             <span class="icon">🎯</span> Indexes & Connection Pool
           </button>
           <button class="nav-item" data-exp="polyglot-persistence">
-            <span class="icon">💾</span> Polyglot, Redlock, BM25
+            <span class="icon">💾</span> Polyglot, Redis Locks, Search
           </button>
         </div>
 
@@ -161,13 +162,13 @@
       </aside>
 
       <!-- Main Stage -->
-      <main class="content-area">
+      <main class="content-area" id="main-content">
         <div class="experiment-header">
           <div class="title-cluster">
             <span class="badge" id="exp-category">Pillar 1: Runtime</span>
             <h2 id="exp-title">Event Loop Execution Order & Microtasks</h2>
             <p id="exp-desc">
-              Demonstrates the deterministic execution phases of Node.js: Synchronous Call Stack -> process.nextTick -> Promise Microtasks -> Macrotasks (Timers & Check).
+              Records the observed execution phases of Node.js: Synchronous Call Stack -> process.nextTick -> Promise Microtasks -> Macrotasks (Timers & Check).
             </p>
           </div>
           <div class="action-cluster">
@@ -191,7 +192,7 @@
         <div class="visualizer-card" id="visualizer-box">
           <div class="card-header">
             <h3>Visual Execution Stage</h3>
-            <span class="status-tag" id="exec-status">Idle (Ready)</span>
+            <span class="status-tag" id="exec-status" role="status" aria-live="polite">Idle (Ready)</span>
           </div>
           <div class="stage-body" id="stage-viewport">
             <div class="placeholder-graphic">Click "Run Live Experiment" to observe real-time execution.</div>
@@ -207,7 +208,7 @@
           </div>
 
           <div class="tab-content active" id="tab-json">
-            <pre><code id="json-output">// Experiment results will stream here...</code></pre>
+            <pre><code id="json-output">// Experiment results will appear here...</code></pre>
           </div>
 
           <div class="tab-content" id="tab-architecture">

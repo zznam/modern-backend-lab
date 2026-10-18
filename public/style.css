@@ -521,3 +521,42 @@ code {
 .doc-body li {
   margin-bottom: 6px;
 }
+
+/* Keep the learning workspace usable on narrow screens and with keyboard navigation. */
+.content-area, .title-cluster { min-width: 0; }
+.content-area > * { flex-shrink: 0; }
+.action-cluster { flex-shrink: 0; margin-left: 16px; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 3px; }
+.primary-btn:disabled { opacity: .65; cursor: wait; transform: none; }
+.skip-link { position: fixed; top: -100px; left: 12px; z-index: 10; padding: 12px; background: var(--bg-elevated); color: white; }
+.skip-link:focus { top: 12px; }
+.stage-body { overflow-x: auto; }
+.tab-bar { overflow-x: auto; }
+.tab-btn { flex-shrink: 0; }
+@media (max-width: 1000px) {
+  .system-status { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .status-pill { display: none; }
+  .sidebar { width: 250px; }
+  .content-area { padding: 20px; }
+  .experiment-header { flex-direction: column; gap: 16px; }
+  .action-cluster { margin-left: 0; }
+}
+@media (max-width: 700px) {
+  body { height: auto; overflow: auto; }
+  .app-layout { height: auto; min-height: 100dvh; }
+  .topbar { height: auto; padding: 16px; align-items: flex-start; flex-direction: column; gap: 12px; }
+  .brand-icon { flex-shrink: 0; }
+  .metrics-quick-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+  .workspace { flex-direction: column; overflow: visible; }
+  .sidebar { width: 100%; max-height: 220px; border-right: 0; border-bottom: 1px solid var(--border-color); }
+  .content-area { padding: 16px; overflow: visible; }
+  .metrics-grid { grid-template-columns: minmax(0, 1fr); }
+  .metric-value { overflow-wrap: anywhere; }
+  .controls-card, .control-group { align-items: flex-start; flex-direction: column; }
+  .control-input { max-width: 100%; }
+  .card-header { gap: 8px; flex-wrap: wrap; }
+  .tab-content, .stage-body { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

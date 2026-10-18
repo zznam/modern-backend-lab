@@ -11,10 +11,10 @@ const EXPERIMENTS_CONFIG = {
     controlsHtml: '',
     architecture: `
       <h4>How the Node.js Event Loop Works</h4>
-      <p>Node.js runs single-threaded JavaScript using the <strong>libuv</strong> event loop. The execution order is deterministic:</p>
+      <p>Node.js runs single-threaded JavaScript using the <strong>libuv</strong> event loop. The trace records the observed execution order:</p>
       <ul>
         <li><strong>Call Stack:</strong> Synchronous execution always runs first to completion.</li>
-        <li><strong>Microtasks Queue:</strong> Drained immediately when the call stack becomes empty. <code>process.nextTick</code> executes before <code>Promise.then</code> callbacks.</li>
+        <li><strong>Microtasks Queue:</strong> Drained at runtime checkpoints after synchronous work. <code>process.nextTick</code> usually runs before Promise callbacks after ordinary callbacks. ESM evaluation and calls inside an existing microtask can produce a different observed order.</li>
         <li><strong>Timers Phase:</strong> Libuv executes expired <code>setTimeout</code> and <code>setInterval</code> callbacks.</li>
         <li><strong>I/O Poll Phase:</strong> Retrieves incoming network packets and OS events via <code>epoll</code> / <code>kqueue</code>.</li>
         <li><strong>Check Phase:</strong> Executes <code>setImmediate</code> callbacks.</li>
@@ -123,7 +123,7 @@ const EXPERIMENTS_CONFIG = {
   'cache-stampede': {
     category: '3. Architecture & Distributed',
     title: 'Cache Stampede (Thundering Herd) & Singleflight Mutex',
-    desc: 'Demonstrates what happens when a hot cache key expires under 50 concurrent requests: 50 simultaneous database hits vs exactly 1 query with Singleflight locking.',
+    desc: 'Compare simultaneous database hits when a hot cache key expires with a single shared query using Singleflight locking. Choose the number of concurrent requests below.',
     controlsHtml: `
       <div class="control-group">
         <label>Concurrent Requests:</label>
@@ -262,6 +262,7 @@ const EXPERIMENTS_CONFIG = {
 
 // Default current experiment
 let currentExpKey = 'event-loop';
+let selectionVersion = 0;
 
 // DOM Elements
 const expCategoryEl = document.getElementById('exp-category');
@@ -296,11 +297,18 @@ document.querySelectorAll('.nav-item').forEach((item) => {
 });
 
 function selectExperiment(key) {
+  selectionVersion++;
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const selected = item.dataset.exp === key;
+    item.classList.toggle('active', selected);
+    item.setAttribute('aria-pressed', String(selected));
+  });
   currentExpKey = key;
+  const nav = [...document.querySelectorAll('.nav-item')].find(item => item.dataset.exp === key);
   const cfg = EXPERIMENTS_CONFIG[key] || {
-    category: 'Learning Module',
-    title: key.replace(/-/g, ' ').toUpperCase(),
-    desc: 'Interactive backend mastery experiment.',
+    category: nav?.closest('.nav-section').querySelector('.section-title').textContent || 'Learning Module',
+    title: nav?.textContent.trim() || key,
+    desc: 'Run this lab to inspect its structured results and compare the demonstrated behavior.',
     controlsHtml: '',
     architecture: '<p>Documentation for this module is available in code.</p>',
     production: '<p>Production guidelines available in code.</p>',
@@ -310,6 +318,11 @@ function selectExperiment(key) {
   expTitleEl.textContent = cfg.title;
   expDescEl.textContent = cfg.desc;
   controlsContainer.innerHTML = cfg.controlsHtml || '<span style="color:var(--text-dim);font-size:13px;">No custom parameters required for this experiment.</span>';
+  controlsContainer.querySelectorAll('.control-group').forEach(group => {
+    const input = group.querySelector('input');
+    const label = group.querySelector('label');
+    if (input && label) label.htmlFor = input.id;
+  });
   docArchitecture.innerHTML = cfg.architecture;
   docProduction.innerHTML = cfg.production;
 
@@ -323,7 +336,11 @@ function selectExperiment(key) {
 
 // Run Experiment Handler
 runBtn.addEventListener('click', async () => {
-  const cfg = EXPERIMENTS_CONFIG[currentExpKey] || {};
+  const key = currentExpKey;
+  const version = selectionVersion;
+  const cfg = EXPERIMENTS_CONFIG[key] || {};
+  const inputs = [...controlsContainer.querySelectorAll('input')];
+  if (inputs.some(input => !input.reportValidity())) return;
   const params = cfg.getParams ? cfg.getParams() : {};
 
   execStatus.textContent = 'Running...';
@@ -334,16 +351,21 @@ runBtn.addEventListener('click', async () => {
     const response = await fetch('/api/experiments/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ experimentId: currentExpKey, params }),
+      body: JSON.stringify({ experimentId: key, params }),
     });
 
     const res = await response.json();
+    if (version !== selectionVersion) return;
+    if (!response.ok) throw new Error(res.error || `Request failed (${response.status})`);
     execStatus.textContent = `Completed in ${res.executionDurationMs}ms`;
     execStatus.style.color = 'var(--accent-green)';
     jsonOutput.textContent = JSON.stringify(res, null, 2);
 
-    renderVisualStage(currentExpKey, res.data, res.executionDurationMs);
+    renderVisualStage(key, res.data, res.executionDurationMs);
   } catch (err) {
+    if (version !== selectionVersion) return;
+    metricsGrid.innerHTML = '';
+    stageViewport.textContent = 'The experiment could not complete. See the error below.';
     execStatus.textContent = 'Error';
     execStatus.style.color = 'var(--accent-red)';
     jsonOutput.textContent = `Error executing experiment: ${err.message}`;
@@ -351,6 +373,10 @@ runBtn.addEventListener('click', async () => {
     runBtn.disabled = false;
   }
 });
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+}
 
 // Render Visual Visualizer Stage
 function renderVisualStage(key, data, durationMs) {
@@ -362,7 +388,7 @@ function renderVisualStage(key, data, durationMs) {
         <div class="metric-card">
           <div class="metric-label">Execution Time</div>
           <div class="metric-value">${durationMs} ms</div>
-          <div class="metric-sub">✓ Deterministic Phase Order</div>
+          <div class="metric-sub">✓ Observed Phase Order</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Trace Steps</div>
@@ -377,9 +403,9 @@ function renderVisualStage(key, data, durationMs) {
           <div class="flow-step">
             <div class="step-num">${step.step}</div>
             <div class="step-content">
-              <div class="step-phase">${step.phase} [${step.type}]</div>
-              <div class="step-title">${step.label}</div>
-              <div class="step-desc">${step.explanation}</div>
+              <div class="step-phase">${escapeHtml(step.phase)} [${escapeHtml(step.type)}]</div>
+              <div class="step-title">${escapeHtml(step.label)}</div>
+              <div class="step-desc">${escapeHtml(step.explanation)}</div>
             </div>
           </div>
         `;
@@ -444,7 +470,7 @@ function renderVisualStage(key, data, durationMs) {
         <div class="metric-card">
           <div class="metric-label">With Singleflight Mutex</div>
           <div class="metric-value" style="color:var(--accent-green);">${withQ} DB Query</div>
-          <div class="metric-sub">Exactly 1 DB query! 98% reduction</div>
+          <div class="metric-sub">Exactly 1 DB query! ${withoutQ ? Math.round((1 - withQ / withoutQ) * 100) : 0}% reduction</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Penetration Defense</div>
@@ -455,7 +481,7 @@ function renderVisualStage(key, data, durationMs) {
 
       stageViewport.innerHTML = `
         <div style="width:100%;text-align:center;">
-          <div style="font-size:16px;font-weight:600;margin-bottom:16px;">Database Queries Under 50 Simultaneous Cache Misses:</div>
+          <div style="font-size:16px;font-weight:600;margin-bottom:16px;">Database Queries Under ${withoutQ} Simultaneous Cache Misses:</div>
           <div style="display:flex;align-items:flex-end;justify-content:center;gap:40px;height:140px;">
             <div style="display:flex;flex-direction:column;align-items:center;">
               <div style="background:#ef4444;width:80px;height:120px;border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;font-weight:700;">${withoutQ}</div>
