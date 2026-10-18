@@ -1,0 +1,96 @@
+/**
+ * Operating Systems Fundamentals:
+ * 1. Process vs Thread vs Coroutine (Goroutine)
+ * 2. Context Switching Overhead
+ * 3. I/O Multiplexing Evolution: select -> poll -> epoll (Linux) / kqueue (macOS/BSD)
+ */
+import os from 'node:os';
+export function getConcurrencyModelMatrix() {
+    return [
+        {
+            model: 'OS Process (fork / spawn)',
+            memoryPerUnit: '4 MB - 64 MB (Virtual memory page table, independent heap & stack)',
+            creationTimeUs: 1500,
+            contextSwitchCost: 'Expensive (~1000 - 3000 ns). Requires TLB (Translation Lookaside Buffer) flush and CPU cache invalidation.',
+            scheduler: 'OS Kernel Preemptive Scheduler',
+            faultIsolation: 'Complete. If one process segfaults, other processes remain untouched.',
+        },
+        {
+            model: 'OS Thread (pthread / worker)',
+            memoryPerUnit: '1 MB - 8 MB (Fixed pre-allocated stack, shared heap)',
+            creationTimeUs: 120,
+            contextSwitchCost: 'Moderate (~500 - 1000 ns). Registers & stack pointer saved; no MMU / TLB flush needed.',
+            scheduler: 'OS Kernel Preemptive Scheduler',
+            faultIsolation: 'Shared. Uncaught exception or memory corruption can crash entire process.',
+        },
+        {
+            model: 'Green Threads / Goroutines / Fibers',
+            memoryPerUnit: '2 KB (Dynamic segmented stack that grows on demand)',
+            creationTimeUs: 2,
+            contextSwitchCost: 'Ultra Cheap (~10 - 50 ns). Userspace context switch saves only ~14 CPU registers, zero kernel traps.',
+            scheduler: 'Userspace M:N Runtime Scheduler (Go runtime, Erlang BEAM, Java Virtual Threads)',
+            faultIsolation: 'Controlled by runtime panic/recover semantics.',
+        },
+        {
+            model: 'Event Loop (Single-Threaded Cooperative)',
+            memoryPerUnit: '~0.5 KB per pending callback closure',
+            creationTimeUs: 0.1,
+            contextSwitchCost: 'Zero kernel switch. Function call return in userspace.',
+            scheduler: 'Libuv / Event Demultiplexer',
+            faultIsolation: 'Zero. Synchronous CPU block or uncaught error freezes/crashes entire loop.',
+        },
+    ];
+}
+export function getIoMultiplexingEvolution() {
+    return [
+        {
+            mechanism: 'select()',
+            complexity: 'O(N) - Must iterate through entire bitmap of file descriptors on every wake',
+            maxDescriptors: 'FD_SETSIZE (Strictly hardcoded to 1024 on most Unix kernels)',
+            kernelToUserCopy: 'Heavy - Entire fd_set bitmask copied into kernel and back every call',
+            triggerMode: 'Level-Triggered',
+            supportedOS: 'POSIX Universal',
+            verdict: 'Historical baseline, completely unsuitable for modern C10K+ concurrency',
+        },
+        {
+            mechanism: 'poll()',
+            complexity: 'O(N) - Linear scan over array of struct pollfd',
+            maxDescriptors: 'Unlimited (Limited only by process file descriptor rlimit)',
+            kernelToUserCopy: 'Heavy - Array of descriptors copied on every call',
+            triggerMode: 'Level-Triggered',
+            supportedOS: 'POSIX Universal',
+            verdict: 'Removed 1024 limit of select, but still suffers from O(N) linear scanning',
+        },
+        {
+            mechanism: 'epoll (epoll_create, epoll_ctl, epoll_wait)',
+            complexity: 'O(1) - Returns only the file descriptors that are actually ready',
+            maxDescriptors: 'Unlimited (Millions of concurrent sockets)',
+            kernelToUserCopy: 'Zero-copy - Uses internal Red-Black tree for registration and Ready List via mmap/shared memory',
+            triggerMode: 'Level-Triggered (LT) and Edge-Triggered (ET)',
+            supportedOS: 'Linux only (Powers Nginx, Envoy, Node.js libuv, Redis)',
+            verdict: 'The gold standard for high-performance Linux networking (solves C10K and C1000K)',
+        },
+        {
+            mechanism: 'kqueue (kqueue, kevent)',
+            complexity: 'O(1) - Event-filter based notification',
+            maxDescriptors: 'Unlimited',
+            kernelToUserCopy: 'Zero-copy - Registered event changelists with batch kernel notification',
+            triggerMode: 'Edge-Triggered and Level-Triggered (Supports Sockets, Files, Signals, Timers)',
+            supportedOS: 'macOS, FreeBSD, OpenBSD (Powers macOS Node.js libuv, Nginx on BSD)',
+            verdict: 'More expressive and versatile than epoll, natively handles file system vnodes & signals',
+        },
+    ];
+}
+export function getHostOsSystemReport() {
+    const isDarwin = process.platform === 'darwin';
+    return {
+        platform: process.platform,
+        arch: process.arch,
+        cpuCount: os.cpus().length,
+        totalMemoryGb: Math.round((os.totalmem() / 1024 / 1024 / 1024) * 100) / 100,
+        freeMemoryGb: Math.round((os.freemem() / 1024 / 1024 / 1024) * 100) / 100,
+        uptimeHours: Math.round((os.uptime() / 3600) * 10) / 10,
+        loadAverage: os.loadavg().map((l) => Math.round(l * 100) / 100),
+        ioMultiplexerUsed: isDarwin ? 'kqueue (Darwin Kernel Event Queue)' : 'epoll (Linux Event Poll)',
+    };
+}

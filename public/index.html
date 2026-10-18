@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modern Backend Engineering Mastery Lab</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Navigation Bar -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h1>Modern Backend Engineering Lab</h1>
+          <span class="subtitle">System Design • Concurrency • Reliability • Observability</span>
+        </div>
+      </div>
+      <div class="system-status">
+        <div class="status-pill healthy">
+          <span class="dot"></span>
+          <span>Node.js v22 Runtime</span>
+        </div>
+        <div class="metrics-quick-bar">
+          <a href="/metrics" target="_blank" class="nav-btn">Prometheus /metrics</a>
+          <a href="/api/telemetry/trace" target="_blank" class="nav-btn">OTel Trace</a>
+          <a href="/api/v1/health" target="_blank" class="nav-btn">Health</a>
+        </div>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <!-- Sidebar Navigation -->
+      <aside class="sidebar">
+        <div class="nav-section">
+          <div class="section-title">1. RUNTIME & SYSTEMS</div>
+          <button class="nav-item active" data-exp="event-loop">
+            <span class="icon">🔄</span> Event Loop & Queues
+          </button>
+          <button class="nav-item" data-exp="worker-threads">
+            <span class="icon">🧵</span> Worker Threads vs CPU Lag
+          </button>
+          <button class="nav-item" data-exp="memory-leak">
+            <span class="icon">🧠</span> V8 Heap & Memory Leaks
+          </button>
+          <button class="nav-item" data-exp="data-structures">
+            <span class="icon">📦</span> LRU, Bloom, Heap, Ring
+          </button>
+          <button class="nav-item" data-exp="raw-tcp-udp">
+            <span class="icon">🔌</span> Raw TCP / UDP & Nagle
+          </button>
+          <button class="nav-item" data-exp="dns-resolution">
+            <span class="icon">🌐</span> DNS Hierarchy & TTL
+          </button>
+          <button class="nav-item" data-exp="tls-handshake">
+            <span class="icon">🔐</span> TLS 1.3 & ECDHE PFS
+          </button>
+          <button class="nav-item" data-exp="load-balancer">
+            <span class="icon">⚖️</span> L4 vs L7 Load Balancers
+          </button>
+          <button class="nav-item" data-exp="protocols">
+            <span class="icon">📡</span> Protocol Showdown (H2/H3/gRPC)
+          </button>
+          <button class="nav-item" data-exp="os-fundamentals">
+            <span class="icon">🐧</span> OS, epoll/kqueue & POSIX
+          </button>
+        </div>
+
+        <div class="nav-section">
+          <div class="section-title">2. API, SECURITY & DATABASES</div>
+          <button class="nav-item" data-exp="rest-pagination">
+            <span class="icon">📑</span> REST Cursor vs Offset
+          </button>
+          <button class="nav-item" data-exp="idempotency">
+            <span class="icon">🛡️</span> Payment Idempotency
+          </button>
+          <button class="nav-item" data-exp="graphql-dataloader">
+            <span class="icon">🔷</span> GraphQL N+1 & DataLoader
+          </button>
+          <button class="nav-item" data-exp="grpc-protobuf">
+            <span class="icon">⚡</span> gRPC Protobuf vs JSON
+          </button>
+          <button class="nav-item" data-exp="auth-jwt-rotation">
+            <span class="icon">🔑</span> JWT Rotation & Replay Attack
+          </button>
+          <button class="nav-item" data-exp="abac-authorization">
+            <span class="icon">📜</span> RBAC vs ABAC Engine
+          </button>
+          <button class="nav-item" data-exp="owasp-lab">
+            <span class="icon">🚨</span> OWASP Top 10 Mitigations
+          </button>
+          <button class="nav-item" data-exp="acid-transactions">
+            <span class="icon">🏦</span> ACID & Isolation Anomalies
+          </button>
+          <button class="nav-item" data-exp="locking-benchmark">
+            <span class="icon">🔒</span> Concurrency Locking (Race)
+          </button>
+          <button class="nav-item" data-exp="db-tuning">
+            <span class="icon">🎯</span> Indexes & Connection Pool
+          </button>
+          <button class="nav-item" data-exp="polyglot-persistence">
+            <span class="icon">💾</span> Polyglot, Redlock, BM25
+          </button>
+        </div>
+
+        <div class="nav-section">
+          <div class="section-title">3. ARCHITECTURE & DISTRIBUTED</div>
+          <button class="nav-item" data-exp="clean-architecture">
+            <span class="icon">📐</span> Clean Architecture & DDD
+          </button>
+          <button class="nav-item" data-exp="system-patterns">
+            <span class="icon">🏛️</span> Monolith vs Microservices
+          </button>
+          <button class="nav-item" data-exp="message-broker">
+            <span class="icon">📬</span> Broker ACK/NACK & DLQ
+          </button>
+          <button class="nav-item" data-exp="outbox-pattern">
+            <span class="icon">📤</span> Transactional Outbox
+          </button>
+          <button class="nav-item" data-exp="saga-pattern">
+            <span class="icon">🔄</span> Saga Distributed Rollback
+          </button>
+          <button class="nav-item" data-exp="cache-stampede">
+            <span class="icon">💨</span> Cache Stampede Singleflight
+          </button>
+          <button class="nav-item" data-exp="cap-theorem">
+            <span class="icon">🔺</span> CAP Theorem CP vs AP
+          </button>
+          <button class="nav-item" data-exp="eventual-consistency">
+            <span class="icon">⏳</span> Vector Clocks & CRDTs
+          </button>
+          <button class="nav-item" data-exp="consistent-hashing">
+            <span class="icon">⭕</span> Consistent Hashing Ring
+          </button>
+        </div>
+
+        <div class="nav-section">
+          <div class="section-title">4. DEVOPS & OBSERVABILITY</div>
+          <button class="nav-item" data-exp="rate-limiting">
+            <span class="icon">🚦</span> Token Bucket & Sliding Window
+          </button>
+          <button class="nav-item" data-exp="circuit-breaker">
+            <span class="icon">🔌</span> Circuit Breaker Fallback
+          </button>
+          <button class="nav-item" data-exp="retry-backoff">
+            <span class="icon">🎲</span> Exponential Backoff + Jitter
+          </button>
+          <button class="nav-item" data-exp="observability">
+            <span class="icon">👁️</span> JSON Logs, Metrics & Traces
+          </button>
+          <button class="nav-item" data-exp="load-stress-benchmark">
+            <span class="icon">🔥</span> Stress Benchmark (RPS / p99)
+          </button>
+          <button class="nav-item" data-exp="devops-k8s">
+            <span class="icon">☸️</span> Docker, K8s & Canary CI/CD
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Stage -->
+      <main class="content-area">
+        <div class="experiment-header">
+          <div class="title-cluster">
+            <span class="badge" id="exp-category">Pillar 1: Runtime</span>
+            <h2 id="exp-title">Event Loop Execution Order & Microtasks</h2>
+            <p id="exp-desc">
+              Demonstrates the deterministic execution phases of Node.js: Synchronous Call Stack -> process.nextTick -> Promise Microtasks -> Macrotasks (Timers & Check).
+            </p>
+          </div>
+          <div class="action-cluster">
+            <button class="primary-btn" id="run-btn">
+              <span class="btn-icon">▶</span> Run Live Experiment
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Parameters Bar (dynamic) -->
+        <div class="controls-card" id="controls-container">
+          <!-- Filled dynamically by JavaScript -->
+        </div>
+
+        <!-- Live Visualizer / Metrics Row -->
+        <div class="metrics-grid" id="metrics-cards">
+          <!-- Dynamic metrics cards -->
+        </div>
+
+        <!-- Interactive Canvas / Graphic Stage -->
+        <div class="visualizer-card" id="visualizer-box">
+          <div class="card-header">
+            <h3>Visual Execution Stage</h3>
+            <span class="status-tag" id="exec-status">Idle (Ready)</span>
+          </div>
+          <div class="stage-body" id="stage-viewport">
+            <div class="placeholder-graphic">Click "Run Live Experiment" to observe real-time execution.</div>
+          </div>
+        </div>
+
+        <!-- Tabbed Inspector & Documentation -->
+        <div class="details-card">
+          <div class="tab-bar">
+            <button class="tab-btn active" data-tab="json">JSON Result Payload</button>
+            <button class="tab-btn" data-tab="architecture">Architectural Mechanics & Deep-Dive</button>
+            <button class="tab-btn" data-tab="production">Production Code & Best Practices</button>
+          </div>
+
+          <div class="tab-content active" id="tab-json">
+            <pre><code id="json-output">// Experiment results will stream here...</code></pre>
+          </div>
+
+          <div class="tab-content" id="tab-architecture">
+            <div class="doc-body" id="doc-architecture">
+              <!-- Architecture explanation -->
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-production">
+            <div class="doc-body" id="doc-production">
+              <!-- Production Code notes -->
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
