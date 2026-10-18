@@ -70,18 +70,26 @@ message ServerMessage {
 }
 `;
 
-// Compact binary Protobuf-like serializer simulation (Tag-Length-Value encoding)
+// Encode the length as a varint (protobuf strings can exceed 127 UTF-8 bytes).
+function varint(value: number): Buffer {
+  const bytes: number[] = [];
+  while (value >= 128) { bytes.push((value % 128) | 128); value = Math.floor(value / 128); }
+  bytes.push(value);
+  return Buffer.from(bytes);
+}
+
+// Minimal protobuf wire encoder for the four fields used by this lab.
 export function encodeBinaryProtobuf(obj: { transactionId: string; customerId: string; amount: number; currency: string }): Buffer {
   const chunks: Buffer[] = [];
 
   // Field 1: transactionId (string, wire type 2)
   const idBuf = Buffer.from(obj.transactionId, 'utf8');
-  chunks.push(Buffer.from([0x0a, idBuf.length])); // (1 << 3) | 2 = 10 (0x0a)
+  chunks.push(Buffer.concat([Buffer.from([0x0a]), varint(idBuf.length)])); // (1 << 3) | 2 = 10 (0x0a)
   chunks.push(idBuf);
 
   // Field 2: customerId (string, wire type 2)
   const custBuf = Buffer.from(obj.customerId, 'utf8');
-  chunks.push(Buffer.from([0x12, custBuf.length])); // (2 << 3) | 2 = 18 (0x12)
+  chunks.push(Buffer.concat([Buffer.from([0x12]), varint(custBuf.length)])); // (2 << 3) | 2 = 18 (0x12)
   chunks.push(custBuf);
 
   // Field 3: amount (double, wire type 1)
@@ -92,7 +100,7 @@ export function encodeBinaryProtobuf(obj: { transactionId: string; customerId: s
 
   // Field 4: currency (string, wire type 2)
   const currBuf = Buffer.from(obj.currency, 'utf8');
-  chunks.push(Buffer.from([0x22, currBuf.length])); // (4 << 3) | 2 = 34 (0x22)
+  chunks.push(Buffer.concat([Buffer.from([0x22]), varint(currBuf.length)])); // (4 << 3) | 2 = 34 (0x22)
   chunks.push(currBuf);
 
   return Buffer.concat(chunks);
@@ -120,8 +128,7 @@ export function compareProtobufVsJsonBenchmark(iterations = 20000): {
   // 2. Serialization Speed
   const startJson = performance.now();
   for (let i = 0; i < iterations; i++) {
-    const s = JSON.stringify(sample);
-    JSON.parse(s);
+    Buffer.from(JSON.stringify(sample), 'utf8');
   }
   const jsonMs = performance.now() - startJson;
 
@@ -140,7 +147,7 @@ export function compareProtobufVsJsonBenchmark(iterations = 20000): {
     throughput: {
       jsonMs: Math.round(jsonMs * 100) / 100,
       protobufMs: Math.round(protoMs * 100) / 100,
-      speedup: `${Math.round((jsonMs / protoMs) * 10) / 10}x faster`,
+      speedup: `${Math.round((jsonMs / protoMs) * 10) / 10}x JSON/binary encoding time ratio`,
     },
     schema: sampleProtoSchema,
   };

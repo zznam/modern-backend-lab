@@ -1,7 +1,7 @@
 /**
  * RESTful API Standards, Pagination (Cursor vs Offset), Filtering, Versioning & Modeling
  */
-import { globalIdempotencyStore } from './idempotency.js';
+import { IdempotencyStore } from './idempotency.js';
 
 export interface OrderItem {
   id: string;
@@ -16,7 +16,7 @@ export interface OrderItem {
 export class OrderDatabase {
   private orders: OrderItem[] = [];
 
-  constructor() {
+  constructor(private idempotencyStore = new IdempotencyStore()) {
     this.seed(10000);
   }
 
@@ -47,11 +47,13 @@ export class OrderDatabase {
     pagination: { offset: number; limit: number; total: number; hasMore: boolean };
     scanComplexity: string;
   } {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new RangeError('limit must be between 1 and 100');
     let dataset = this.orders;
     if (filterStatus) {
       dataset = dataset.filter((o) => o.status === filterStatus);
     }
 
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new RangeError('offset must be a nonnegative integer');
     const total = dataset.length;
     const data = dataset.slice(offset, offset + limit);
 
@@ -68,7 +70,7 @@ export class OrderDatabase {
   }
 
   // 2. Keyset / Cursor-based Pagination: WHERE id > cursor LIMIT limit
-  // Benefit: O(1) B-Tree indexed seek directly to cursor row, stable against insertions/deletions!
+  // Benefit: O(log N) B-Tree indexed seek directly to cursor row, stable against insertions/deletions!
   public getWithCursorPagination(
     cursor: string | null,
     limit: number,
@@ -78,6 +80,7 @@ export class OrderDatabase {
     pagination: { nextCursor: string | null; limit: number; hasMore: boolean };
     scanComplexity: string;
   } {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new RangeError('limit must be between 1 and 100');
     let dataset = this.orders;
     if (filterStatus) {
       dataset = dataset.filter((o) => o.status === filterStatus);
@@ -86,10 +89,17 @@ export class OrderDatabase {
     let startIndex = 0;
     if (cursor) {
       const decodedCursor = Buffer.from(cursor, 'base64').toString('utf8');
-      const foundIdx = dataset.findIndex((o) => o.id === decodedCursor);
-      if (foundIdx !== -1) {
-        startIndex = foundIdx + 1;
+      if (!/^ord_\d+$/.test(decodedCursor)) throw new Error('Invalid cursor');
+      const orderNumber = Number(decodedCursor.slice(4));
+      // Seek the first greater key even if the cursor row is missing or excluded by a filter.
+      let low = 0;
+      let high = dataset.length;
+      while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+        if (dataset[mid].orderNumber <= orderNumber) low = mid + 1;
+        else high = mid;
       }
+      startIndex = low;
     }
 
     const data = dataset.slice(startIndex, startIndex + limit);
@@ -103,7 +113,7 @@ export class OrderDatabase {
         limit,
         hasMore: startIndex + limit < dataset.length,
       },
-      scanComplexity: 'Direct B-Tree index seek on cursor key. Zero rows discarded (O(1) cost). Immune to page drift.',
+      scanComplexity: 'Binary search seeks the first greater key in O(log N) after optional in-memory filtering. A database index avoids scanning earlier rows.',
     };
   }
 
@@ -111,8 +121,13 @@ export class OrderDatabase {
     payload: { customerName: string; amount: number },
     idempotencyKey?: string
   ): { statusCode: number; order: OrderItem; idempotentReplay: boolean } {
+    if (!payload || typeof payload.customerName !== 'string' || !payload.customerName.trim() || payload.customerName.length > 200
+      || typeof payload.amount !== 'number' || !Number.isFinite(payload.amount) || payload.amount <= 0) {
+      throw new Error('422 Unprocessable: customerName and a finite positive amount are required');
+    }
+    payload = { customerName: payload.customerName.trim(), amount: payload.amount };
     if (idempotencyKey) {
-      const check = globalIdempotencyStore.acquireOrCheck(idempotencyKey, payload);
+      const check = this.idempotencyStore.acquireOrCheck(idempotencyKey, payload);
       if (check.action === 'CONFLICT_IN_FLIGHT') {
         throw new Error('409 Conflict: An order request with this idempotency key is already currently processing.');
       }
@@ -138,7 +153,7 @@ export class OrderDatabase {
     this.orders.push(newOrder);
 
     if (idempotencyKey) {
-      globalIdempotencyStore.saveResult(idempotencyKey, 201, newOrder);
+      this.idempotencyStore.saveResult(idempotencyKey, 201, newOrder);
     }
 
     return {

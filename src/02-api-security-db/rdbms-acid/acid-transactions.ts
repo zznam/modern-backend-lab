@@ -40,6 +40,8 @@ export class AcidSimulator {
     amount: number,
     simulateCrashAtStep = 0
   ): Promise<{ success: boolean; rolledBack: boolean; balances: Record<string, number>; reason: string }> {
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Amount must be finite and positive');
+    if (fromId === toId) throw new Error('Sender and recipient must differ');
     const from = this.accounts.get(fromId);
     const to = this.accounts.get(toId);
 
