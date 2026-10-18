@@ -33,38 +33,36 @@ func main() {
 	fmt.Printf("Spawning %d concurrent Goroutines...\n", goroutineCount)
 
 	start := time.Now()
-	var wg sync.WaitGroup
-	wg.Add(goroutineCount)
-
-	channel := make(chan int, goroutineCount)
-
+	var ready sync.WaitGroup
+	var finished sync.WaitGroup
+	ready.Add(goroutineCount)
+	finished.Add(goroutineCount)
+	release := make(chan struct{})
 	for i := 0; i < goroutineCount; i++ {
-		go func(id int) {
-			defer wg.Done()
-			channel <- id * 2
-		}(i)
+		go func() {
+			defer finished.Done()
+			ready.Done()
+			<-release
+		}()
 	}
+	ready.Wait()
+	spawnDuration := time.Since(start)
+	var memStatsLive runtime.MemStats
+	runtime.ReadMemStats(&memStatsLive)
+	stackGrowth := memStatsLive.StackInuse - memStatsBefore.StackInuse
+	allocated := memStatsLive.TotalAlloc - memStatsBefore.TotalAlloc
+	close(release)
+	finished.Wait()
 
-	wg.Wait()
-	duration := time.Since(start)
+	fmt.Println("\n📊 Results (all goroutines alive at the memory sample):")
+	fmt.Printf("• Time to spawn and park %d goroutines: %v\n", goroutineCount, spawnDuration)
+	fmt.Printf("• Total time including release and completion: %v\n", time.Since(start))
+	fmt.Printf("• Stack memory growth: %s (~%.2f KB per parked goroutine)\n", formatBytes(stackGrowth), float64(stackGrowth)/float64(goroutineCount)/1024)
+	fmt.Printf("• Heap bytes allocated during spawning: %s\n", formatBytes(allocated))
+	fmt.Println("\n🧠 Architectural Context (estimates, not an OS-thread benchmark):")
+	fmt.Println("• Goroutine stacks start small and grow dynamically; runtime and channel overhead also consume memory.")
+	fmt.Println("• OS thread stack reservations depend on the platform and are not equal to resident physical memory.")
+	fmt.Println("• Context switch costs depend on hardware, workload, and scheduler; this program does not measure them.")
 
-	var memStatsAfter runtime.MemStats
-	runtime.ReadMemStats(&memStatsAfter)
-
-	heapUsed := memStatsAfter.HeapAlloc - memStatsBefore.HeapAlloc
-	bytesPerGoroutine := float64(heapUsed) / float64(goroutineCount)
-
-	fmt.Println("\n📊 Results:")
-	fmt.Printf("• Total time to spawn, execute & sync %d goroutines: %v\n", goroutineCount, duration)
-	fmt.Printf("• Average time per goroutine: %v\n", duration/goroutineCount)
-	fmt.Printf("• Total Memory Allocated: %s\n", formatBytes(heapUsed))
-	fmt.Printf("• Memory per Goroutine: ~%.2f KB\n", bytesPerGoroutine/1024.0)
-
-	fmt.Println("\n🧠 Architectural Comparison:")
-	fmt.Println("----------------------------------------------------------------")
-	fmt.Println("• Goroutine Stack: Starts at ~2 KB. Dynamically expands & shrinks.")
-	fmt.Printf("• OS Thread Stack: Fixed at 2 MB - 8 MB. 100k OS threads would consume ~%d GB RAM!\n", (goroutineCount*8)/(1024))
-	fmt.Println("• Context Switch: Goroutines switch in userspace (~15ns, ~14 registers).")
-	fmt.Println("                  OS Threads switch in kernel (~1500ns, TLB cache flush).")
 	fmt.Println("================================================================")
 }

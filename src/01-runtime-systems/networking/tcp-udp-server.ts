@@ -3,6 +3,7 @@
  */
 import net from 'node:net';
 import dgram from 'node:dgram';
+import { once } from 'node:events';
 
 export interface HandshakeStep {
   step: number;
@@ -101,52 +102,55 @@ export async function runRawTcpUdpDemo(): Promise<{
   udpResult: { roundtripMs: number; received: string };
   nagleExplanation: string;
 }> {
-  const tcpPort = 44101;
-  const udpPort = 44102;
-
-  // 1. Raw TCP Server & Client
-  const tcpServer = net.createServer((socket) => {
-    socket.setNoDelay(true); // Disable Nagle's algorithm for low-latency small packet transfer
-    socket.on('data', (data) => {
-      socket.write(`TCP_ECHO:${data.toString()}`);
-    });
+  // Ephemeral loopback ports let concurrent experiments run without colliding.
+  const tcpServer = net.createServer(socket => {
+    socket.setNoDelay(true);
+    socket.on('error', () => socket.destroy());
+    socket.on('data', data => socket.end(`TCP_ECHO:${data.toString()}`));
   });
+  let tcpReceived: string;
+  let tcpDuration: number;
+  const listening = once(tcpServer, 'listening');
+  tcpServer.listen(0, '127.0.0.1');
+  await listening;
+  const address = tcpServer.address() as net.AddressInfo;
+  const client = net.createConnection({ port: address.port, host: '127.0.0.1' });
+  client.setNoDelay(true);
+  client.setTimeout(3000, () => client.destroy(new Error('TCP roundtrip timed out')));
+  try {
+    const tcpStart = performance.now();
+    const data = once(client, 'data');
+    client.write('PING_TCP');
+    tcpReceived = String((await data)[0]);
+    tcpDuration = performance.now() - tcpStart;
+  } finally {
+    client.destroy();
+    await new Promise<void>(resolve => tcpServer.close(() => resolve()));
+  }
 
-  await new Promise<void>((resolve) => tcpServer.listen(tcpPort, '127.0.0.1', () => resolve()));
-
-  const tcpStart = performance.now();
-  const tcpReceived = await new Promise<string>((resolve) => {
-    const client = net.createConnection({ port: tcpPort, host: '127.0.0.1' }, () => {
-      client.setNoDelay(true);
-      client.write('PING_TCP');
-    });
-    client.on('data', (chunk) => {
-      client.end();
-      resolve(chunk.toString());
-    });
-  });
-  const tcpDuration = performance.now() - tcpStart;
-  await new Promise<void>((resolve) => tcpServer.close(() => resolve()));
-
-  // 2. Raw UDP Socket & Client
   const udpServer = dgram.createSocket('udp4');
-  await new Promise<void>((resolve) => udpServer.bind(udpPort, '127.0.0.1', () => resolve()));
-
-  udpServer.on('message', (msg, rinfo) => {
-    udpServer.send(`UDP_ECHO:${msg.toString()}`, rinfo.port, rinfo.address);
-  });
-
-  const udpStart = performance.now();
   const udpClient = dgram.createSocket('udp4');
-  const udpReceived = await new Promise<string>((resolve) => {
-    udpClient.on('message', (msg) => {
-      udpClient.close();
-      resolve(msg.toString());
+  let udpReceived: string;
+  let udpDuration: number;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const bound = once(udpServer, 'listening');
+    udpServer.bind(0, '127.0.0.1');
+    await bound;
+    udpServer.on('message', (msg, remote) => {
+      udpServer.send(`UDP_ECHO:${msg.toString()}`, remote.port, remote.address);
     });
-    udpClient.send('PING_UDP', udpPort, '127.0.0.1');
-  });
-  const udpDuration = performance.now() - udpStart;
-  await new Promise<void>((resolve) => udpServer.close(() => resolve()));
+    const udpStart = performance.now();
+    const message = once(udpClient, 'message');
+    timeout = setTimeout(() => udpClient.emit('error', new Error('UDP roundtrip timed out')), 3000);
+    udpClient.send('PING_UDP', udpServer.address().port, '127.0.0.1');
+    udpReceived = String((await message)[0]);
+    udpDuration = performance.now() - udpStart;
+  } finally {
+    clearTimeout(timeout);
+    udpClient.close();
+    udpServer.close();
+  }
 
   return {
     tcpResult: { roundtripMs: Math.round(tcpDuration * 100) / 100, received: tcpReceived },

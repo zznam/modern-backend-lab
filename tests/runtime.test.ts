@@ -9,9 +9,12 @@ import { parsePosixMode, calculateUmask, AdvisoryFileLockManager } from '../src/
 import { getConcurrencyModelMatrix, getIoMultiplexingEvolution } from '../src/01-runtime-systems/os-fundamentals/process-vs-thread.js';
 
 describe('Pillar 1: Runtime, Networking & OS Fundamentals', () => {
-  it('Event Loop phases execute in deterministic order', async () => {
+  it('Event Loop trace records synchronous work before asynchronous phases', async () => {
     const { trace } = await runEventLoopExperiment();
-    expect(trace.length).toBeGreaterThanOrEqual(4);
+    expect(trace).toHaveLength(6);
+    expect(trace.slice(0, 2).every(step => step.type === 'sync')).toBe(true);
+    expect(new Set(trace.slice(2, 4).map(step => step.label))).toEqual(new Set(['process.nextTick(...)', 'Promise.resolve().then(...)']));
+    expect(new Set(trace.slice(4).map(step => step.label))).toEqual(new Set(['setTimeout(..., 0)', 'setImmediate(...)']));
     expect(trace[0].phase).toBe('Call Stack');
     const microtask = trace.find((t) => t.type === 'microtask');
     expect(microtask).toBeDefined();

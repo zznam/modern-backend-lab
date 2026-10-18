@@ -84,18 +84,18 @@ export function getIoMultiplexingEvolution(): MultiplexingEvolution[] {
     },
     {
       mechanism: 'epoll (epoll_create, epoll_ctl, epoll_wait)',
-      complexity: 'O(1) - Returns only the file descriptors that are actually ready',
+      complexity: 'Returns ready descriptors rather than scanning the full interest set; work scales with ready events',
       maxDescriptors: 'Unlimited (Millions of concurrent sockets)',
-      kernelToUserCopy: 'Zero-copy - Uses internal Red-Black tree for registration and Ready List via mmap/shared memory',
+      kernelToUserCopy: 'Maintains kernel interest and ready lists; epoll_wait copies ready event records to a user-provided buffer',
       triggerMode: 'Level-Triggered (LT) and Edge-Triggered (ET)',
       supportedOS: 'Linux only (Powers Nginx, Envoy, Node.js libuv, Redis)',
       verdict: 'The gold standard for high-performance Linux networking (solves C10K and C1000K)',
     },
     {
       mechanism: 'kqueue (kqueue, kevent)',
-      complexity: 'O(1) - Event-filter based notification',
+      complexity: 'Event-filter notification; work scales with the events returned',
       maxDescriptors: 'Unlimited',
-      kernelToUserCopy: 'Zero-copy - Registered event changelists with batch kernel notification',
+      kernelToUserCopy: 'Batches changelists and returned events across the kernel/userspace boundary',
       triggerMode: 'Edge-Triggered and Level-Triggered (Supports Sockets, Files, Signals, Timers)',
       supportedOS: 'macOS, FreeBSD, OpenBSD (Powers macOS Node.js libuv, Nginx on BSD)',
       verdict: 'More expressive and versatile than epoll, natively handles file system vnodes & signals',
@@ -109,19 +109,21 @@ export function getHostOsSystemReport(): {
   cpuCount: number;
   totalMemoryGb: number;
   freeMemoryGb: number;
-  uptimeHours: number;
+  uptimeHours: number | null;
   loadAverage: number[];
   ioMultiplexerUsed: string;
 } {
   const isDarwin = process.platform === 'darwin';
+  let uptimeHours: number | null = null;
+  try { uptimeHours = Math.round((os.uptime() / 3600) * 10) / 10; } catch { /* Restricted hosts may deny host uptime. */ }
   return {
     platform: process.platform,
     arch: process.arch,
     cpuCount: os.cpus().length,
     totalMemoryGb: Math.round((os.totalmem() / 1024 / 1024 / 1024) * 100) / 100,
     freeMemoryGb: Math.round((os.freemem() / 1024 / 1024 / 1024) * 100) / 100,
-    uptimeHours: Math.round((os.uptime() / 3600) * 10) / 10,
+    uptimeHours,
     loadAverage: os.loadavg().map((l) => Math.round(l * 100) / 100),
-    ioMultiplexerUsed: isDarwin ? 'kqueue (Darwin Kernel Event Queue)' : 'epoll (Linux Event Poll)',
+    ioMultiplexerUsed: isDarwin ? 'kqueue (Darwin Kernel Event Queue)' : process.platform === 'linux' ? 'epoll (Linux Event Poll)' : 'Platform-dependent libuv backend',
   };
 }
