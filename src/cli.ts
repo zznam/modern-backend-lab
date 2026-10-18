@@ -22,6 +22,9 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
+let cliClosed = false;
+rl.on('close', () => { cliClosed = true; });
+
 const menu = `
 ================================================================
 🚀 Modern Backend Engineering Mastery Lab (CLI Mode)
@@ -152,31 +155,31 @@ async function handleSelection(choice: string): Promise<void> {
     case 'q':
     case 'exit':
       rl.close();
-      process.exit(0);
+      return;
     default:
-      console.log('Invalid option. Please select 1-13 or q.');
+      throw new Error('Invalid option. Please select 1-13 or q.');
   }
 
   const duration = Math.round((performance.now() - start) * 10) / 10;
   console.log(`\n✓ Experiment finished in ${duration}ms\n`);
-  if (!process.argv[2]) {
-    promptUser();
-  }
+
 }
 
 function promptUser(): void {
   rl.question(menu, (ans) => {
-    handleSelection(ans);
+    handleSelection(ans).catch(err => console.error(`Experiment failed: ${err.message}`)).finally(() => {
+      if (!cliClosed) promptUser();
+    });
   });
 }
 
 // Check if run directly
 const directArg = process.argv[2];
 if (directArg) {
-  handleSelection(directArg).then(() => {
-    rl.close();
-    process.exit(0);
-  });
+  handleSelection(directArg).catch(err => {
+    console.error(`Experiment failed: ${err.message}`);
+    process.exitCode = 1;
+  }).finally(() => rl.close());
 } else {
   promptUser();
 }
