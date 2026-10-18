@@ -1,13 +1,13 @@
 # 🚀 Modern Backend Engineering Mastery Lab
 
-[![Tests](https://img.shields.io/badge/tests-58%20passed-brightgreen.svg)](tests/)
+[![Tests](https://github.com/zznam/modern-backend-lab/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/zznam/modern-backend-lab/actions/workflows/ci-cd.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](tsconfig.json)
 [![Node.js](https://img.shields.io/badge/Node.js-22.x-green.svg)](package.json)
 [![Go Companion](https://img.shields.io/badge/Go-1.22+-00ADD8.svg)](src/companion-go/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](Dockerfile)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Manifests-326CE5.svg)](k8s/)
 
-An ultra-comprehensive, hands-on, runnable learning platform built directly in `~/workspace/modern-backend-lab` to master modern backend engineering, high-availability architecture, concurrency, data integrity, and distributed systems at scale.
+A hands-on learning platform for exploring modern backend engineering, high-availability architecture, concurrency, data integrity, and distributed systems at scale.
 
 ---
 
@@ -15,7 +15,7 @@ An ultra-comprehensive, hands-on, runnable learning platform built directly in `
 
 | Pillar | Core Topic | Live Runnable Lab | Implementation File |
 | :--- | :--- | :--- | :--- |
-| **1. Runtime & Systems** | Event Loop Phases & Microtasks | Deterministic phase trace | [`event-loop-demo.ts`](src/01-runtime-systems/event-loop/event-loop-demo.ts) |
+| **1. Runtime & Systems** | Event Loop Phases & Microtasks | Observed event-loop phase trace | [`event-loop-demo.ts`](src/01-runtime-systems/event-loop/event-loop-demo.ts) |
 | | Worker Threads vs CPU Lag | Event loop stall vs Worker pool | [`worker-pool.ts`](src/01-runtime-systems/worker-threads/worker-pool.ts) |
 | | V8 Heap & Memory Leak Debugger | Live closure/emitter leak & GC detector | [`memory-leak-lab.ts`](src/01-runtime-systems/memory-gc/memory-leak-lab.ts) |
 | | Data Structures (LRU, Ring, Heap, Bloom, Trie) | O(1) eviction, circular buffer, min-heap | [`data-structures.ts`](src/01-runtime-systems/data-structures/data-structures.ts) |
@@ -25,7 +25,7 @@ An ultra-comprehensive, hands-on, runnable learning platform built directly in `
 | | L4 vs L7 Proxies & Load Balancers | Round Robin, Least Conns, IP Hash | [`proxy-load-balancer.ts`](src/01-runtime-systems/networking/proxy-load-balancer.ts) |
 | | Protocol Showdown | HTTP/1.1 vs HTTP/2 vs HTTP/3 vs WS vs gRPC | [`protocol-showdown.ts`](src/01-runtime-systems/protocols/protocol-showdown.ts) |
 | | OS Context Switching & epoll/kqueue | Green threads vs OS threads, file locks | [`process-vs-thread.ts`](src/01-runtime-systems/os-fundamentals/process-vs-thread.ts) |
-| | Go Companion Concurrency | 100,000 Goroutines vs OS threads bench | [`concurrency_bench.go`](src/companion-go/concurrency_bench.go) |
+| | Go Companion Concurrency | 100,000 parked goroutines; stack memory measurement | [`concurrency_bench.go`](src/companion-go/concurrency_bench.go) |
 | | Live Server Troubleshooting | Bash script for CPU, FD leaks & zombie check | [`live-troubleshoot.sh`](src/scripts/live-troubleshoot.sh) |
 | **2. APIs, Security & DBs** | RESTful Standards & Pagination | Keyset Cursor vs Offset benchmark | [`rest-controller.ts`](src/02-api-security-db/rest-standards/rest-controller.ts) |
 | | Payment Idempotency Engine | Atomic locking & response cache replay | [`idempotency.ts`](src/02-api-security-db/rest-standards/idempotency.ts) |
@@ -40,7 +40,7 @@ An ultra-comprehensive, hands-on, runnable learning platform built directly in `
 | | Polyglot Persistence & Dual-Mode Adapters | Live PostgreSQL (`pg`) & Redis (`ioredis`) + in-memory fallback | [`polyglot-manager.ts`](src/02-api-security-db/polyglot-storage/polyglot-manager.ts), [`dual-mode-adapters.ts`](src/02-api-security-db/adapters/dual-mode-adapters.ts) |
 | **3. Architecture & Distributed** | Clean / Hexagonal Architecture & DDD | Aggregates, Value Objects, Ports & DI | [`clean-architecture.ts`](src/03-architecture-distributed/clean-architecture/clean-architecture.ts) |
 | | System Patterns Trade-Offs | Monolith vs Modular Monolith vs Microservices | [`architecture-comparison.ts`](src/03-architecture-distributed/system-patterns/architecture-comparison.ts) |
-| | Event-Driven Message Broker | ACK/NACK, Exponential Retries, DLQ & Dedup | [`message-broker.ts`](src/03-architecture-distributed/event-driven-broker/message-broker.ts) |
+| | Event-Driven Message Broker | ACK/NACK, retry queues, DLQ & Dedup | [`message-broker.ts`](src/03-architecture-distributed/event-driven-broker/message-broker.ts) |
 | | Transactional Outbox Pattern | Atomic DB write + event relay (Dual-write fix) | [`outbox-pattern.ts`](src/03-architecture-distributed/distributed-tx/outbox-pattern.ts) |
 | | Saga Pattern Orchestrator | Forward execution & reverse compensation | [`saga-pattern.ts`](src/03-architecture-distributed/distributed-tx/saga-pattern.ts) |
 | | Cache Stampede (Thundering Herd) | Singleflight Mutex vs Uncontrolled Stampede | [`caching-engine.ts`](src/03-architecture-distributed/caching-strategies/caching-engine.ts) |
@@ -56,18 +56,30 @@ An ultra-comprehensive, hands-on, runnable learning platform built directly in `
 | | Distributed Tracing (OTel / Jaeger) | W3C `traceparent` & waterfall span spans | [`tracer.ts`](src/04-devops-reliability/observability/tracer.ts) |
 | | Contract Testing & Load Stressing | Consumer-driven verification & Autocannon load | [`contract-testing.ts`](src/04-devops-reliability/testing/contract-testing.ts) |
 | | Containerization & K8s | Multi-stage Dockerfile, Compose & K8s HPA | [`Dockerfile`](Dockerfile), [`k8s/`](k8s/) |
-| | CI/CD Progressive Delivery | GitHub Actions with Canary rollout | [`ci-cd.yml`](.github/workflows/ci-cd.yml) |
+| | CI/CD Progressive Delivery | GitHub Actions with simulated Canary rollout | [`ci-cd.yml`](.github/workflows/ci-cd.yml) |
 
 ---
 
 ## ⚡ Quick Start
 
 ### 1. Launch the Interactive Web Dashboard
-Run the server and open the web dashboard in your browser:
+Install dependencies with Node.js 22.12+, 24, or 26+ (Node.js 22 LTS recommended), then start the dashboard:
 ```bash
+npm ci
 npm start
 ```
-Then visit: **`http://localhost:4000`**
+Then visit: **`http://localhost:4000`**. No external services are required: the lab uses in-memory adapters when database URLs are absent.
+
+The server binds to `127.0.0.1` by default. Set `HOST=0.0.0.0` explicitly for containers or access from another device. `PORT` defaults to `4000`. The Docker image sets `HOST` automatically.
+
+This is a local teaching lab with intentionally vulnerable examples and expensive experiments, without application authentication. Use a trusted development environment. Orders, sessions, and simulations live in process memory; multiple replicas do not share those stores.
+
+For a compiled production-dependency smoke run:
+```bash
+npm run build
+npm run start:prod
+```
+`npm start` uses the development TypeScript runner; `start:prod` uses compiled JavaScript. HTTP load testing is optional and its tool is loaded only by `npm run bench:load`, so it is not required by the production server.
 
 ### 2. Interactive Terminal CLI Runner
 You can run any experiment or benchmark headless directly from your terminal:
@@ -85,13 +97,30 @@ npm run lab 13   # OpenTelemetry Distributed Trace Generation
 ```
 
 ### 3. Run the Automated Test Suite
-Execute the full Vitest suite (56 tests covering all 4 pillars):
+Run the complete local validation gate (typecheck, unit/integration tests, and build):
 ```bash
-npm test
+npm run check
 ```
+The HTTP integration suite starts an ephemeral local server and runs every dashboard module, order creation/replay, input rejection, metrics, readiness, and WebSocket echo. The memory-leak module intentionally emits a `MaxListenersExceededWarning` before cleaning up its listeners.
+
+To include real PostgreSQL rollback, missing-account, and concurrent-transfer tests, provide a **disposable** test database (the tests reset the two seeded lab accounts):
+```bash
+TEST_DATABASE_URL=postgresql://lab_user:lab_password@localhost:5432/mastery_db npm test
+```
+PostgreSQL tests are skipped when `TEST_DATABASE_URL` is absent. Live Redis tests are optional too:
+```bash
+TEST_REDIS_URL=redis://127.0.0.1:6379 npm test
+```
+Use a disposable Redis instance; tests create uniquely prefixed short-lived values, locks, and a leaderboard. Both test URLs can be set together. Configured PostgreSQL and Redis failure paths also have isolated adapter tests.
+
+To load-test an already-running local server:
+```bash
+npm run bench:load -- http://127.0.0.1:4000/api/v1/health
+```
+The external load report labels its available tail percentile as `latencyP97_5`; the in-process benchmark reports p95 and p99 from its own samples.
 
 ### 4. Run the Go Companion Concurrency Suite
-Test 100,000 concurrent Goroutines vs OS threads:
+Measure spawn time and stack memory with 100,000 goroutines alive at once. OS threads are discussed as context; the program does not create or measure 100,000 OS threads:
 ```bash
 npm run bench:go
 ```
@@ -109,7 +138,22 @@ docker compose up -d
 - **Web App:** `http://localhost:4000`
 - **Prometheus:** `http://localhost:9090`
 - **Grafana:** `http://localhost:3001` (user: `admin`, pass: `admin`)
-- **Jaeger Tracing:** `http://localhost:16686`
+- **Jaeger UI:** `http://localhost:16686` (provisioned for exploration; the lab currently generates local simulated spans and does not export OTLP)
+
+Compose ports are published on loopback only. Compose credentials are local examples. `/api/v1/ready` reports each adapter's mode and returns 503 when a configured service is unreachable. PostgreSQL schema initialization runs before the server accepts requests. Redis connects before live operations; visiting readiness first is unnecessary.
+
+With no URL, each adapter uses the simulator. With `DATABASE_URL` or `REDIS_URL` configured, failed live operations return errors instead of switching to an unrelated in-memory store. PostgreSQL transfers lock both existing accounts in stable order, validate funds, and roll back simulated failures in the live transaction.
+
+Optional environment variables:
+- `DATABASE_URL`: PostgreSQL connection string; omitted for the ACID simulator.
+- `REDIS_URL`: Redis connection string; omitted for the Redis simulator.
+- `JWT_SECRET`: signing key for the token lab. If omitted, a random process-local key is generated; tokens are not portable across restarts.
+- `LOG_LEVEL`: Pino verbosity, default `info`.
+- `HOST`, `PORT`: listening address and port.
+
+Copy `.env.example` if helpful. The app does not load `.env` automatically; export variables in your shell or use `node --env-file=.env dist/server.js` after building.
+
+Kubernetes manifests require a built image, real service addresses, generated secrets, an ingress controller, and certificate setup. The workflow's canary job prints a deployment simulation; it does not deploy or validate a cluster. Its security-audit step currently permits audit failure. Infrastructure CI behavior has not been changed by this validation pass.
 
 ---
 
@@ -127,7 +171,7 @@ In [`caching-engine.ts`](src/03-architecture-distributed/caching-strategies/cach
 - **With Singleflight Mutex:** The first request initiates the DB query; all other 49 concurrent requests attach to the in-flight promise, reducing database load from 50 queries down to **exactly 1 query (98% reduction)**.
 
 ### 3. Distributed Transactions: Outbox & Saga Patterns
-- **Transactional Outbox ([`outbox-pattern.ts`](src/03-architecture-distributed/distributed-tx/outbox-pattern.ts)):** Solves the dual-write problem by saving the business record and the outbox event in the same atomic database transaction. Even if the message broker is temporarily offline, zero events are lost.
+- **Transactional Outbox ([`outbox-pattern.ts`](src/03-architecture-distributed/distributed-tx/outbox-pattern.ts)):** Solves the dual-write problem by saving the business record and the outbox event in the same atomic database transaction. Even if the message broker is temporarily offline, pending events remain available for the next relay call in this in-memory simulation. Process restarts still lose simulation state.
 - **Saga Orchestrator ([`saga-pattern.ts`](src/03-architecture-distributed/distributed-tx/saga-pattern.ts)):** Manages multi-service workflows without 2-Phase Commit (2PC). When an downstream step fails (e.g., inventory reservation), the orchestrator automatically executes reverse compensating transactions (refunding payment and cancelling the order).
 
 ### 4. Distributed Systems Theory: CAP & Consistent Hashing
@@ -143,3 +187,21 @@ In [`caching-engine.ts`](src/03-architecture-distributed/caching-strategies/cach
 - **Telemetry:** Prometheus (`prom-client`), Pino structured JSON logger, OpenTelemetry W3C tracing
 - **Companion:** Go 1.22+ (Goroutines vs OS threads benchmark)
 - **Containerization:** Multi-stage Dockerfile, Docker Compose, Kubernetes manifests
+
+
+## API behavior and teaching boundaries
+
+- All 36 dashboard navigation items have runnable handlers. Results return after the experiment completes; there is no SSE stream. `/ws` is a separate echo demonstration.
+- `POST /api/experiments/run` requires an `experimentId` string and optional object `params`. Numeric controls are checked on the server (up to 80,000 primes, 100 concurrent tasks, 5,000 requests/keys, or 100,000 serialization iterations). At most two experiments run concurrently; additional runs receive 429 and `Retry-After`.
+- `GET /api/v1/orders` accepts `limit` 1–100, a nonnegative `offset`, a valid `status`, or a base64 order-ID `cursor`. Cursor pages seek the first greater key even when filtering excludes the cursor row. The array simulation still pays for filtering; a real database needs an appropriate index.
+- `POST /api/v1/orders` requires a nonempty `customerName` (maximum 200 characters) and finite positive `amount`. An optional `Idempotency-Key` replays the original response for the same payload; changed payloads receive 422. The in-memory key cache expires after 60 seconds and does not coordinate replicas.
+- Request bodies and WebSocket payloads are limited to 64 KiB. API errors use JSON, correlation IDs are bounded, and unknown paths share a single Prometheus route label.
+- SIGINT/SIGTERM start bounded draining, reject new HTTP work with 503, close WebSockets, and release database connections. Cleanup failures produce a nonzero exit.
+- The SSRF lab performs static URL/IP checks only. A real HTTP client must validate DNS results, redirects, and the destination at connection time. The token lab revokes refresh-token families on replay; already-issued access JWTs retain their signed lifetime.
+- The broker, outbox, CAP, GraphQL batching, and tracing examples are teaching simulations. The broker requeues retries immediately; the retry-backoff module demonstrates delay calculations separately. Redis locking uses one Redis instance with ownership tokens, not the multi-node Redlock algorithm.
+- Serialization compares JSON-to-UTF-8 encoding with a minimal protobuf wire encoder; it does not run a gRPC server. Worker lag is measured from timer delays and varies by hardware and scheduler.
+
+
+Event-loop ordering notes follow the [Node.js process documentation](https://nodejs.org/api/process.html#when-to-use-queuemicrotask-vs-processnexttick) and [event-loop guide](https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick). The I/O comparison describes ready-event delivery, as documented by [epoll(7)](https://man7.org/linux/man-pages/man7/epoll.7.html) and [epoll_wait(2)](https://man7.org/linux/man-pages/man2/epoll_wait.2.html), without claiming that event copies use mmap or shared memory.
+
+The Docker health probe uses IPv4 loopback to match the container listener. Grafana queries use the exported `backend_lab_` Node.js metric prefix, aggregate histogram buckets before quantiles, and calculate error percentages against total request rates.
