@@ -8,11 +8,11 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - PORT=4000
       - DATABASE_URL=postgresql://lab_user:lab_password@postgres:5432/mastery_db
       - REDIS_URL=redis://redis:6379
-      - JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - JAEGER_ENDPOINT=http://jaeger:4318/v1/traces
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,18 +82,22 @@ services:
       - "3001:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
     networks:
       - backend-network
 
-  # 6. Distributed Tracing: Jaeger
+  # 6. Distributed Tracing: Jaeger (OTLP-native)
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: lab-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
     ports:
       - "16686:16686" # Jaeger Web UI
-      - "14268:14268" # Collector HTTP endpoint
+      - "4318:4318"   # OTLP HTTP collector endpoint
     networks:
       - backend-network
 

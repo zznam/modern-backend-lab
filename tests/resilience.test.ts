@@ -5,7 +5,7 @@ import { RetryStrategies } from '../src/04-devops-reliability/resilience/retry-b
 import { GracefulShutdownCoordinator } from '../src/04-devops-reliability/resilience/graceful-shutdown.js';
 import { ContractVerifier } from '../src/04-devops-reliability/testing/contract-testing.js';
 import { DistributedTracer } from '../src/04-devops-reliability/observability/tracer.js';
-import { runInProcessStressBenchmark } from '../src/04-devops-reliability/load-testing/runner.ts';
+import { runInProcessStressBenchmark } from '../src/04-devops-reliability/load-testing/runner.js';
 
 describe('Pillar 4: Testing, Operations, Reliability & Observability', () => {
   describe('Resilience & Rate Limiting', () => {

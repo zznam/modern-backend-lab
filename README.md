@@ -1,6 +1,6 @@
 # 🚀 Modern Backend Engineering Mastery Lab
 
-[![Tests](https://img.shields.io/badge/tests-56%20passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-58%20passed-brightgreen.svg)](tests/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](tsconfig.json)
 [![Node.js](https://img.shields.io/badge/Node.js-22.x-green.svg)](package.json)
 [![Go Companion](https://img.shields.io/badge/Go-1.22+-00ADD8.svg)](src/companion-go/)
@@ -37,7 +37,7 @@ An ultra-comprehensive, hands-on, runnable learning platform built directly in `
 | | ACID Properties & Isolation Anomalies | Dirty, Non-repeatable & Phantom reads | [`acid-transactions.ts`](src/02-api-security-db/rdbms-acid/acid-transactions.ts) |
 | | Concurrency Race Conditions | No Lock (Lost Update) vs Pessimistic vs Optimistic | [`locking-strategies.ts`](src/02-api-security-db/rdbms-acid/locking-strategies.ts) |
 | | Database Performance Tuning | B-Tree/GIN indexes & HikariCP pool formula | [`index-tuning.ts`](src/02-api-security-db/db-tuning/index-tuning.ts) |
-| | Polyglot Persistence | Redis Redlock, Sorted Sets, BM25 Search | [`polyglot-manager.ts`](src/02-api-security-db/polyglot-storage/polyglot-manager.ts) |
+| | Polyglot Persistence & Dual-Mode Adapters | Live PostgreSQL (`pg`) & Redis (`ioredis`) + in-memory fallback | [`polyglot-manager.ts`](src/02-api-security-db/polyglot-storage/polyglot-manager.ts), [`dual-mode-adapters.ts`](src/02-api-security-db/adapters/dual-mode-adapters.ts) |
 | **3. Architecture & Distributed** | Clean / Hexagonal Architecture & DDD | Aggregates, Value Objects, Ports & DI | [`clean-architecture.ts`](src/03-architecture-distributed/clean-architecture/clean-architecture.ts) |
 | | System Patterns Trade-Offs | Monolith vs Modular Monolith vs Microservices | [`architecture-comparison.ts`](src/03-architecture-distributed/system-patterns/architecture-comparison.ts) |
 | | Event-Driven Message Broker | ACK/NACK, Exponential Retries, DLQ & Dedup | [`message-broker.ts`](src/03-architecture-distributed/event-driven-broker/message-broker.ts) |

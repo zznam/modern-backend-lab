@@ -46,6 +46,7 @@ import { globalAcidSimulator } from './02-api-security-db/rdbms-acid/acid-transa
 import { LockingBenchmark } from './02-api-security-db/rdbms-acid/locking-strategies.js';
 import { getIndexTypesComparison, analyzeExecutionPlan, calculateOptimalConnectionPool } from './02-api-security-db/db-tuning/index-tuning.js';
 import { getPolyglotPersistenceMatrix, globalRedisSimulator, InvertedIndexSearchEngine } from './02-api-security-db/polyglot-storage/polyglot-manager.js';
+import { globalPostgresAdapter, globalRedisAdapter } from './02-api-security-db/adapters/dual-mode-adapters.js';
 
 import { setupCleanArchitectureLab } from './03-architecture-distributed/clean-architecture/clean-architecture.js';
 import { getArchitecturePatternsMatrix } from './03-architecture-distributed/system-patterns/architecture-comparison.js';
@@ -105,8 +106,20 @@ app.get('/api/v1/health', (req, res) => {
   });
 });
 
-app.get('/api/v1/ready', (req, res) => {
-  res.json({ status: 'READY', connectionsHealthy: true });
+app.get('/api/v1/ready', async (req, res) => {
+  const [pgHealth, redisHealth] = await Promise.all([
+    globalPostgresAdapter.healthCheck(),
+    globalRedisAdapter.healthCheck(),
+  ]);
+
+  const allHealthy = pgHealth.status !== 'DISCONNECTED' && redisHealth.status !== 'DISCONNECTED';
+  res.status(allHealthy ? 200 : 503).json({
+    status: allHealthy ? 'READY' : 'DEGRADED',
+    adapters: {
+      postgres: pgHealth,
+      redis: redisHealth,
+    },
+  });
 });
 
 app.get('/metrics', async (req, res) => {
@@ -248,8 +261,10 @@ app.post('/api/experiments/run', async (req, res) => {
           cryptoAesGcm: OwaspSecurityLab.demonstrateAes256GcmEncryption('HighlyConfidentialFinancialData'),
         };
         break;
-      case 'acid-transactions':
+      case 'acid-transactions': {
+        const dualModeTransfer = await globalPostgresAdapter.executeAtomicTransfer('acc_alice', 'acc_bob', 100);
         result = {
+          dualModeTransfer,
           normalTransfer: await globalAcidSimulator.executeAtomicTransfer('acc_alice', 'acc_bob', 100),
           crashRollback: await globalAcidSimulator.executeAtomicTransfer('acc_alice', 'acc_bob', 100, 1),
           dirtyRead: globalAcidSimulator.simulateDirtyReadAnomaly(),
@@ -257,6 +272,7 @@ app.post('/api/experiments/run', async (req, res) => {
           phantomRead: globalAcidSimulator.simulatePhantomReadAnomaly(),
         };
         break;
+      }
       case 'locking-benchmark':
         result = {
           noLock: await LockingBenchmark.runNoLock(1000, 10, params.concurrency || 30),
@@ -278,6 +294,10 @@ app.post('/api/experiments/run', async (req, res) => {
         redis.zadd('game_leaderboard', 1250, 'NinjaCoder');
         redis.zadd('game_leaderboard', 2400, 'ByteMaster');
 
+        const dualModeLock = await globalRedisAdapter.acquireDistributedLock('dual_order_lock', 5000);
+        await globalRedisAdapter.zadd('dual_game_leaderboard', 3500, 'DualMaster');
+        const dualLeaderboard = await globalRedisAdapter.zrevrange('dual_game_leaderboard', 3);
+
         const search = new InvertedIndexSearchEngine();
         search.indexDocument(1, 'Distributed message queues with Kafka and RabbitMQ');
         search.indexDocument(2, 'PostgreSQL query optimization with B-Tree indexes');
@@ -287,6 +307,11 @@ app.post('/api/experiments/run', async (req, res) => {
           storageMatrix: getPolyglotPersistenceMatrix(),
           redisRedlock: lock,
           redisLeaderboard: redis.zrevrange('game_leaderboard'),
+          dualModeRedis: {
+            mode: globalRedisAdapter.getMode(),
+            lock: dualModeLock,
+            leaderboard: dualLeaderboard,
+          },
           searchEngineResults: search.search(params.searchQuery || 'message queues'),
         };
         break;
@@ -468,6 +493,15 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
 globalShutdownCoordinator.registerHook('HTTP Server Teardown', async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
+globalShutdownCoordinator.registerHook('PostgreSQL Pool Teardown', async () => {
+  await globalPostgresAdapter.close();
+});
+globalShutdownCoordinator.registerHook('Redis Client Teardown', async () => {
+  await globalRedisAdapter.close();
+});
+
+// Auto-initialize PostgreSQL schema if live database is reachable
+globalPostgresAdapter.initSchema().catch(() => {});
 
 server.listen(PORT, '0.0.0.0', () => {
   ContextLogger.info(`🚀 Modern Backend Engineering Lab server listening on port ${PORT}`);

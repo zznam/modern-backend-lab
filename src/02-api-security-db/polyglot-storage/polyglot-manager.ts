@@ -103,7 +103,7 @@ export class RedisEngineSimulator {
     const lockKey = `lock:${resourceKey}`;
     const current = this.kv.get(lockKey);
     // Atomic check: ONLY delete if token matches! (Simulates Redis Lua script)
-    if (current && current.value.value === lockToken) {
+    if (current && (current.value === lockToken || current.value?.value === lockToken)) {
       this.kv.delete(lockKey);
       return true;
     }

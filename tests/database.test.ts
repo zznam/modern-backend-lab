@@ -5,6 +5,7 @@ import { analyzeExecutionPlan, calculateOptimalConnectionPool } from '../src/02-
 import { RedisEngineSimulator, InvertedIndexSearchEngine } from '../src/02-api-security-db/polyglot-storage/polyglot-manager.js';
 import { runNPlusOneBenchmark } from '../src/02-api-security-db/graphql-grpc/graphql-engine.js';
 import { OrderDatabase } from '../src/02-api-security-db/rest-standards/rest-controller.js';
+import { DualModePostgresAdapter, DualModeRedisAdapter } from '../src/02-api-security-db/adapters/dual-mode-adapters.js';
 
 describe('Pillar 2: Databases, Query Optimization & Polyglot Persistence', () => {
   describe('ACID Transactions & Rollback', () => {
@@ -124,6 +125,68 @@ describe('Pillar 2: Databases, Query Optimization & Polyglot Persistence', () =>
       const page2 = db.getWithCursorPagination(page1.pagination.nextCursor, 5);
       expect(page2.data).toHaveLength(5);
       expect(page2.data[0].id).not.toBe(page1.data[0].id);
+    });
+  });
+
+  describe('Dual-Mode Database & Cache Adapters (PostgreSQL + Redis)', () => {
+    it('DualModePostgresAdapter operates safely in in-memory fallback without DATABASE_URL', async () => {
+      const pgAdapter = new DualModePostgresAdapter();
+      expect(pgAdapter.getMode()).toBe('IN_MEMORY_FALLBACK');
+
+      const health = await pgAdapter.healthCheck();
+      expect(health.service).toBe('PostgreSQL');
+      expect(health.mode).toBe('IN_MEMORY_FALLBACK');
+      expect(health.status).toBe('FALLBACK_READY');
+
+      const transfer = await pgAdapter.executeAtomicTransfer('acc_alice', 'acc_bob', 150);
+      expect(transfer.success).toBe(true);
+      expect(transfer.mode).toBe('IN_MEMORY_FALLBACK');
+      expect(transfer.balances.acc_alice).toBe(850);
+      expect(transfer.balances.acc_bob).toBe(650);
+
+      // Rollback verification
+      const rollbackTransfer = await pgAdapter.executeAtomicTransfer('acc_alice', 'acc_bob', 150, 1);
+      expect(rollbackTransfer.success).toBe(false);
+      expect(rollbackTransfer.rolledBack).toBe(true);
+
+      await pgAdapter.close();
+    });
+
+    it('DualModeRedisAdapter operates safely in in-memory fallback without REDIS_URL', async () => {
+      const redisAdapter = new DualModeRedisAdapter();
+      expect(redisAdapter.getMode()).toBe('IN_MEMORY_FALLBACK');
+
+      const health = await redisAdapter.healthCheck();
+      expect(health.service).toBe('Redis');
+      expect(health.mode).toBe('IN_MEMORY_FALLBACK');
+      expect(health.status).toBe('FALLBACK_READY');
+
+      // Key-Value with TTL
+      await redisAdapter.set('test_key', { foo: 'bar' }, 10);
+      const val = await redisAdapter.get('test_key');
+      expect(val).toEqual({ foo: 'bar' });
+
+      // Distributed Locking
+      const lock = await redisAdapter.acquireDistributedLock('res_1', 3000);
+      expect(lock.acquired).toBe(true);
+      expect(lock.lockToken).toBeDefined();
+
+      // Conflicting lock
+      const conflict = await redisAdapter.acquireDistributedLock('res_1', 3000);
+      expect(conflict.acquired).toBe(false);
+
+      // Release lock
+      const released = await redisAdapter.releaseDistributedLock('res_1', lock.lockToken!);
+      expect(released.released).toBe(true);
+
+      // Leaderboard
+      await redisAdapter.zadd('leaderboard', 100, 'UserA');
+      await redisAdapter.zadd('leaderboard', 200, 'UserB');
+      const top = await redisAdapter.zrevrange('leaderboard', 1);
+      expect(top[0].member).toBe('UserB');
+      expect(top[0].score).toBe(200);
+
+      await redisAdapter.close();
     });
   });
 });
