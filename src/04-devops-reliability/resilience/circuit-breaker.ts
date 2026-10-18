@@ -13,6 +13,8 @@ export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 export class CircuitBreaker {
   private state: CircuitBreakerState = 'CLOSED';
   private failureCount = 0;
+  private probeInFlight = false;
+  private generation = 0;
   private successCount = 0;
   private lastFailureTimestamp = 0;
 
@@ -26,6 +28,7 @@ export class CircuitBreaker {
     // If OPEN and reset timeout has elapsed, transition to HALF_OPEN
     if (this.state === 'OPEN' && Date.now() - this.lastFailureTimestamp >= this.resetTimeoutMs) {
       this.state = 'HALF_OPEN';
+      this.generation++;
       this.successCount = 0;
     }
     return this.state;
@@ -34,25 +37,30 @@ export class CircuitBreaker {
   public async execute<T>(action: () => Promise<T>, fallback?: () => Promise<T>): Promise<{ result: T; fromFallback: boolean }> {
     const currentState = this.getState();
 
-    if (currentState === 'OPEN') {
+    if (currentState === 'OPEN' || (currentState === 'HALF_OPEN' && this.probeInFlight)) {
       if (fallback) {
         const fbResult = await fallback();
         return { result: fbResult, fromFallback: true };
       }
-      throw new Error('503 Service Unavailable: Circuit Breaker is OPEN (Fast Fail)');
+      throw new Error('503 Service Unavailable: Circuit Breaker is OPEN or a recovery probe is in flight (Fast Fail)');
     }
 
+    const generation = this.generation;
+    const isProbe = currentState === 'HALF_OPEN';
+    if (isProbe) this.probeInFlight = true;
     try {
       const result = await action();
-      this.recordSuccess();
+      if (generation === this.generation) this.recordSuccess();
       return { result, fromFallback: false };
     } catch (err) {
-      this.recordFailure();
+      if (generation === this.generation) this.recordFailure();
       if (fallback) {
         const fbResult = await fallback();
         return { result: fbResult, fromFallback: true };
       }
       throw err;
+    } finally {
+      if (isProbe) this.probeInFlight = false;
     }
   }
 
@@ -62,6 +70,7 @@ export class CircuitBreaker {
       if (this.successCount >= this.halfOpenSuccessThreshold) {
         // Recovery confirmed: Reset to CLOSED
         this.state = 'CLOSED';
+        this.generation++;
         this.failureCount = 0;
       }
     } else {
@@ -75,16 +84,20 @@ export class CircuitBreaker {
 
     if (this.state === 'HALF_OPEN' || this.failureCount >= this.failureThreshold) {
       this.state = 'OPEN';
+      this.generation++;
     }
   }
 
   public tripOpen(): void {
     this.state = 'OPEN';
+    this.generation++;
     this.lastFailureTimestamp = Date.now();
   }
 
   public reset(): void {
     this.state = 'CLOSED';
+    this.generation++;
+    this.probeInFlight = false;
     this.failureCount = 0;
     this.successCount = 0;
   }

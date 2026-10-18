@@ -32,7 +32,8 @@ export class DistributedTracer {
 
   public static parseTraceparent(header: string): { traceId: string; parentSpanId: string } | null {
     const parts = header.split('-');
-    if (parts.length < 4 || parts[0] !== '00') return null;
+    if (!/^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/.test(header)
+      || /^0+$/.test(parts[1]) || /^0+$/.test(parts[2])) return null;
     return {
       traceId: parts[1],
       parentSpanId: parts[2],

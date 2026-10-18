@@ -15,6 +15,7 @@ export class TokenBucketRateLimiter {
   private lastRefillTimestamp: number;
 
   constructor(capacity: number, refillRatePerSec: number) {
+    if (!Number.isFinite(capacity) || capacity <= 0 || !Number.isFinite(refillRatePerSec) || refillRatePerSec <= 0) throw new Error('Capacity and refill rate must be finite and positive');
     this.capacity = capacity;
     this.refillRatePerSec = refillRatePerSec;
     this.tokens = capacity;
@@ -23,7 +24,7 @@ export class TokenBucketRateLimiter {
 
   private refill(): void {
     const now = Date.now();
-    const elapsedSeconds = (now - this.lastRefillTimestamp) / 1000;
+    const elapsedSeconds = Math.max(0, now - this.lastRefillTimestamp) / 1000;
     const tokensToAdd = elapsedSeconds * this.refillRatePerSec;
 
     this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
@@ -31,6 +32,7 @@ export class TokenBucketRateLimiter {
   }
 
   public allowRequest(tokensRequired = 1): { allowed: boolean; remainingTokens: number } {
+    if (!Number.isFinite(tokensRequired) || tokensRequired <= 0) throw new Error('Required tokens must be finite and positive');
     this.refill();
 
     if (this.tokens >= tokensRequired) {
@@ -51,6 +53,7 @@ export class SlidingWindowRateLimiter {
   private requestTimestamps = new Map<string, number[]>(); // clientId -> timestamps[]
 
   constructor(windowSizeMs = 60000, maxRequests = 100) {
+    if (!Number.isSafeInteger(windowSizeMs) || windowSizeMs <= 0 || !Number.isSafeInteger(maxRequests) || maxRequests <= 0) throw new Error('Window and request limit must be positive integers');
     this.windowSizeMs = windowSizeMs;
     this.maxRequests = maxRequests;
   }

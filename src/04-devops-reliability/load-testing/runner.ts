@@ -2,7 +2,7 @@
  * Automated Load & Stress Testing Runner (Autocannon / k6 style)
  * Measures Throughput (RPS), Latency (p50, p95, p99), and Error Rates under load.
  */
-import autocannon from 'autocannon';
+import { pathToFileURL } from 'node:url';
 
 export interface LoadTestSummary {
   url: string;
@@ -11,7 +11,7 @@ export interface LoadTestSummary {
   requestsTotal: number;
   throughputRps: number;
   latencyP50: number;
-  latencyP95: number;
+  latencyP97_5: number;
   latencyP99: number;
   errorsTotal: number;
   timeoutsTotal: number;
@@ -22,6 +22,7 @@ export async function runLoadBenchmark(
   durationSeconds = 5,
   connections = 20
 ): Promise<LoadTestSummary> {
+  const { default: autocannon } = await import('autocannon');
   return new Promise((resolve, reject) => {
     const instance = autocannon(
       {
@@ -39,7 +40,7 @@ export async function runLoadBenchmark(
           requestsTotal: result.requests.total,
           throughputRps: Math.round(result.requests.average),
           latencyP50: result.latency.p50,
-          latencyP95: result.latency.p97_5,
+          latencyP97_5: result.latency.p97_5,
           latencyP99: result.latency.p99,
           errorsTotal: result.errors,
           timeoutsTotal: result.timeouts,
@@ -63,6 +64,9 @@ export async function runInProcessStressBenchmark(
   rps: number;
   latencyMs: { min: number; avg: number; p95: number; p99: number; max: number };
 }> {
+  if (!Number.isSafeInteger(totalRequests) || totalRequests < 1 || !Number.isSafeInteger(concurrency) || concurrency < 1) {
+    throw new RangeError('Requests and concurrency must be positive integers');
+  }
   const latencies: number[] = [];
   const start = performance.now();
 
@@ -96,4 +100,9 @@ export async function runInProcessStressBenchmark(
       max: Math.round(latencies[latencies.length - 1] * 100) / 100,
     },
   };
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runLoadBenchmark(process.argv[2]).then(result => console.log(JSON.stringify(result, null, 2)))
+    .catch(err => { console.error(String(err)); process.exitCode = 1; });
 }

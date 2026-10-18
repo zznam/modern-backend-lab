@@ -31,6 +31,10 @@ export class GracefulShutdownCoordinator {
     }
   }
 
+  public isDraining(): boolean {
+    return this.isShuttingDown;
+  }
+
   public getActiveRequests(): number {
     return this.activeRequestCount;
   }
@@ -58,28 +62,34 @@ export class GracefulShutdownCoordinator {
     while (this.activeRequestCount > 0 && Date.now() - drainStart < maxDrainTimeMs) {
       await new Promise((r) => setTimeout(r, 50));
     }
-    logs.push(`[GracefulShutdown] Step 2 complete: All in-flight requests drained.`);
+    const drainedRequests = initialActive - this.activeRequestCount;
+    let success = this.activeRequestCount === 0;
+    logs.push(success ? '[GracefulShutdown] All in-flight requests drained.' : `[GracefulShutdown] Drain timeout: ${this.activeRequestCount} requests still active.`);
 
     // Step 3: Execute registered teardown hooks (DB, Redis, Message Queues)
     const executedHooks: string[] = [];
     for (const hook of this.hooks) {
+      let timeout: ReturnType<typeof setTimeout> | undefined;
       try {
         logs.push(`[GracefulShutdown] Step 3: Executing cleanup hook '${hook.name}'...`);
         await Promise.race([
           hook.fn(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Hook timeout')), hook.timeoutMs || 5000)),
+          new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Hook timeout')), hook.timeoutMs ?? 5000); }),
         ]);
         executedHooks.push(hook.name);
         logs.push(`[GracefulShutdown] Hook '${hook.name}' completed successfully.`);
       } catch (err: any) {
+        success = false;
         logs.push(`[GracefulShutdown] Hook '${hook.name}' error: ${err.message}`);
+      } finally {
+        clearTimeout(timeout);
       }
     }
 
-    logs.push(`[GracefulShutdown] Teardown complete. Clean exit with code 0.`);
+    logs.push(`[GracefulShutdown] Teardown complete. Cleanup sequence finished.`);
     return {
-      success: true,
-      drainedRequests: initialActive,
+      success,
+      drainedRequests,
       executedHooks,
       logs,
     };
