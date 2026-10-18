@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/server.js",
   "engines": {
-    "node": ">=22.0.0"
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
   },
   "scripts": {
     "start": "tsx src/server.ts",
@@ -17,7 +17,9 @@
     "build": "tsc -p tsconfig.build.json",
     "bench:load": "tsx src/04-devops-reliability/load-testing/runner.ts",
     "bench:go": "go run src/companion-go/concurrency_bench.go",
-    "troubleshoot": "bash src/scripts/live-troubleshoot.sh"
+    "troubleshoot": "bash src/scripts/live-troubleshoot.sh",
+    "check": "npm run typecheck && npm test && npm run build",
+    "start:prod": "node dist/server.js"
   },
   "keywords": [
     "backend",
@@ -51,5 +53,10 @@
     "tsx": "^4.23.15",
     "typescript": "^5.8.2",
     "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "hyperid": {
+      "uuid": "^11.1.1"
+    }
   }
 }
