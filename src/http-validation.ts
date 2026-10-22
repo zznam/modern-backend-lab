@@ -42,6 +42,9 @@ export function experimentInput(body: unknown): { experimentId: string; params: 
     projectionBatch: [0, 3], onCallDoctors: [2, 10],
     producerRate: [1, 100], consumerRate: [1, 100], queueCapacity: [1, 100],
     sloBasisPoints: [9000, 9999], longErrorBasisPoints: [0, 10000], shortErrorBasisPoints: [0, 10000],
+    readQuorum: [1, 3], writeQuorum: [1, 3], failedReplicas: [0, 2],
+    memtableLimit: [2, 6], compaction: [0, 1], crashPoint: [0, 2], rejectVote: [0, 1],
+    watermarkLag: [0, 20], allowedLateness: [0, 20],
   };
   for (const [key, range] of Object.entries(bounds)) {
     if (params[key] !== undefined) integerInput(params[key], key, ...range);

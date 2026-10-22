@@ -71,6 +71,10 @@ import { runEventSourcingLab } from './05-advanced-systems/event-sourcing.js';
 import { runSnapshotLab } from './05-advanced-systems/snapshot-isolation.js';
 import { runBackpressureLab } from './05-advanced-systems/backpressure.js';
 import { runSloLab } from './05-advanced-systems/slo-burn.js';
+import { runReplicationLab } from './05-advanced-systems/replication-quorums.js';
+import { runLsmLab } from './05-advanced-systems/lsm-compaction.js';
+import { runTwoPhaseCommitLab } from './05-advanced-systems/two-phase-commit.js';
+import { runStreamWatermarkLab } from './05-advanced-systems/stream-watermarks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -224,6 +228,18 @@ app.post('/api/experiments/run', async (req, res) => {
         break;
       case 'slo-burn-rate':
         result = runSloLab(params.sloBasisPoints, params.longErrorBasisPoints, params.shortErrorBasisPoints);
+        break;
+      case 'replication-quorums':
+        result = runReplicationLab(params.readQuorum, params.writeQuorum, params.failedReplicas);
+        break;
+      case 'lsm-compaction':
+        result = runLsmLab(params.memtableLimit, params.compaction);
+        break;
+      case 'two-phase-commit':
+        result = runTwoPhaseCommitLab(params.crashPoint, params.rejectVote);
+        break;
+      case 'stream-watermarks':
+        result = runStreamWatermarkLab(params.watermarkLag, params.allowedLateness);
         break;
       // Track 1: Runtime & Systems
       case 'event-loop':

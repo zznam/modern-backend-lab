@@ -37,7 +37,7 @@
       <!-- Sidebar Navigation -->
       <aside class="sidebar" aria-label="Learning modules">
         <div class="sidebar-tools">
-          <div class="curriculum-heading"><h2>Explore the curriculum</h2><span id="topic-total">42 labs</span></div>
+          <div class="curriculum-heading"><h2>Explore the curriculum</h2><span id="topic-total">46 labs</span></div>
           <label class="sr-only" for="topic-search">Search topics</label>
           <input id="topic-search" type="search" placeholder="Search topics, e.g. consensus" autocomplete="off">
           <label for="learning-path">Learning path</label>
@@ -46,15 +46,16 @@
             <option value="foundations">Backend foundations</option>
             <option value="distributed">Distributed correctness</option>
             <option value="reliability">Production reliability</option>
+            <option value="data-systems">Advanced data systems</option>
           </select>
           <div class="filter-row">
             <div><label for="topic-level">Difficulty</label><select id="topic-level"><option value="all">All levels</option><option value="foundation">Foundation</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></div>
             <div><label for="topic-status">Progress</label><select id="topic-status"><option value="all">All labs</option><option value="unfinished">To learn</option><option value="completed">Completed</option></select></div>
           </div>
-          <div class="progress-heading"><span id="progress-label">0 of 42 completed</span><span class="local-note">Saved locally</span></div>
-          <progress id="learning-progress" value="0" max="42" aria-label="Learning path completion"></progress>
+          <div class="progress-heading"><span id="progress-label">0 of 46 completed</span><span class="local-note">Saved locally</span></div>
+          <progress id="learning-progress" value="0" max="46" aria-label="Learning path completion"></progress>
           <p id="path-description" class="path-description">Explore freely or choose a guided sequence.</p>
-          <div class="browse-summary"><span id="filter-count" role="status" aria-live="polite">42 topics</span><button id="clear-filters" class="text-btn">Clear filters</button></div>
+          <div class="browse-summary"><span id="filter-count" role="status" aria-live="polite">46 topics</span><button id="clear-filters" class="text-btn">Clear filters</button></div>
         </div>
         <nav class="topic-list" aria-label="Topics">
         <div class="nav-section">
@@ -188,6 +189,10 @@
           <button class="nav-item" data-exp="snapshot-isolation"><span class="icon">◫</span> MVCC & Write Skew</button>
           <button class="nav-item" data-exp="backpressure"><span class="icon">⇥</span> Backpressure & Load Shedding</button>
           <button class="nav-item" data-exp="slo-burn-rate"><span class="icon">◴</span> SLO Budgets & Burn Rates</button>
+          <button class="nav-item" data-exp="replication-quorums"><span class="icon">⋈</span> Replication & Read Repair</button>
+          <button class="nav-item" data-exp="lsm-compaction"><span class="icon">▤</span> LSM Trees & Compaction</button>
+          <button class="nav-item" data-exp="two-phase-commit"><span class="icon">⇄</span> Two-Phase Commit & Recovery</button>
+          <button class="nav-item" data-exp="stream-watermarks"><span class="icon">≋</span> Watermarks & Late Data</button>
         </div>
         <p id="no-topics" class="empty-topics" hidden>No topics match. Try a broader search or clear the filters.</p>
         </nav>
@@ -219,6 +224,7 @@
         <div class="controls-card" id="controls-container">
           <!-- Filled dynamically by JavaScript -->
         </div>
+        <section id="scenario-container" class="scenario-card" aria-label="Experiment scenarios" hidden></section>
 
         <!-- Live Visualizer / Metrics Row -->
         <div class="metrics-grid" id="metrics-cards">

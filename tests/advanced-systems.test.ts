@@ -104,8 +104,8 @@ describe('Curriculum integrity', () => {
     const script = readFileSync(new URL('../public/curriculum.js', import.meta.url), 'utf8');
     const { guides, advanced, paths } = runInNewContext(`${script}\n({guides: TOPIC_GUIDES, advanced: ADVANCED_TOPICS, paths: LEARNING_PATHS})`);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBe(42);
-    expect(Object.keys(advanced)).toHaveLength(6);
+    expect(ids.length).toBe(46);
+    expect(Object.keys(advanced)).toHaveLength(10);
     expect(Object.keys(guides).length + Object.keys(advanced).length).toBe(ids.length);
     for (const id of ids) {
       const topic = advanced[id];
