@@ -612,6 +612,22 @@ progress::-webkit-progress-value { background: linear-gradient(90deg, var(--acce
 .step-content { min-width: 0; }
 .step-title, .step-desc, .model-note, .doc-body code { overflow-wrap: anywhere; }
 .controls-card input { width: 110px; }
+.scenario-card { padding: 16px 20px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); }
+.scenario-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; }
+.scenario-heading h3 { font-size: 13px; }
+.scenario-heading span, #scenario-expectation { font-size: 12px; color: var(--text-muted); line-height: 1.7; }
+.scenario-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+.scenario-buttons .secondary-btn[aria-pressed=true] { color: #bae6fd; border-color: #477c9f; background: #132a3f; }
+.run-comparison { margin-bottom: 22px; padding: 16px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; }
+.run-comparison h4 { font-size: 14px; margin-bottom: 6px; }
+.comparison-note, .run-comparison caption { font-size: 11px; color: var(--text-muted); line-height: 1.6; text-align: left; }
+.run-comparison table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; margin-top: 12px; }
+.run-comparison caption { margin-bottom: 10px; }
+.run-comparison th, .run-comparison td { padding: 8px; text-align: left; vertical-align: top; overflow-wrap: anywhere; border-bottom: 1px solid var(--border-color); }
+.run-comparison th { font-weight: 500; color: var(--text-muted); }
+.run-comparison th:first-child { width: 42%; }
+.run-comparison tbody + tbody { border-top: 2px solid var(--border-color); }
+.comparison-changed td:last-child { color: #bae6fd; background: rgba(14,165,233,.09); font-weight: 600; }
 @media (max-width: 1200px) {
   .sidebar { width: 290px; }
   .learning-card { flex-direction: column; gap: 12px; }
@@ -627,4 +643,6 @@ progress::-webkit-progress-value { background: linear-gradient(90deg, var(--acce
   .primary-btn { width: 100%; justify-content: center; }
   .action-cluster { width: 100%; }
   .flow-step { gap: 10px; padding: 10px; }
+  .scenario-card, .run-comparison { padding: 12px; }
+  .run-comparison th, .run-comparison td { padding: 7px 4px; }
 }

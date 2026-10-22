@@ -1,10 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { once } from 'node:events';
 import { WebSocket } from 'ws';
 import { server, startServer } from '../src/server.js';
 import { globalShutdownCoordinator } from '../src/04-devops-reliability/resilience/graceful-shutdown.js';
 import { CachingEngineLab } from '../src/03-architecture-distributed/caching-strategies/caching-engine.js';
+import { runReplicationLab } from '../src/05-advanced-systems/replication-quorums.js';
+import { runLsmLab } from '../src/05-advanced-systems/lsm-compaction.js';
+import { runTwoPhaseCommitLab } from '../src/05-advanced-systems/two-phase-commit.js';
+import { runStreamWatermarkLab } from '../src/05-advanced-systems/stream-watermarks.js';
 
 let base: string;
 beforeAll(async () => {
@@ -25,6 +30,15 @@ function post(path: string, body: unknown, headers = {}) {
 describe('Dashboard → HTTP → labs', () => {
   const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   const ids = [...html.matchAll(/data-exp="([^"]+)"/g)].map(match => match[1]);
+  const curriculum = readFileSync(new URL('../public/curriculum.js', import.meta.url), 'utf8');
+  const presets = runInNewContext(`${curriculum}\nObject.entries(ADVANCED_TOPICS).flatMap(([id, topic]) => (topic.scenarios || []).map(scenario => [id, scenario.label, scenario.params]))`) as [string, string, Record<string, number>][];
+  it.each(presets)('runs the dashboard preset %s: %s', async (experimentId, _label, params) => {
+    const response = await post('/api/experiments/run', { experimentId, params });
+    const body = await response.json() as { data: { metrics: unknown[]; steps: unknown[] } };
+    expect(response.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.metrics).toHaveLength(3);
+    expect(body.data.steps.length).toBeGreaterThan(0);
+  });
   it.each(ids)('runs the dashboard module %s', async experimentId => {
     const response = await post('/api/experiments/run', { experimentId });
     const body = await response.json() as { data: any; experimentId: string; executionDurationMs: number };
@@ -59,6 +73,41 @@ describe('Dashboard → HTTP → labs', () => {
     expect((await fetch(`${base}/api/v1/ready`)).status).toBe(200);
     const metrics = await (await fetch(`${base}/metrics`)).text();
     expect(metrics).toContain('http_requests_total');
+  });
+
+  it.each([
+    ['replication-quorums', { readQuorum: 1, writeQuorum: 1, failedReplicas: 1 }, () => runReplicationLab(1, 1, 1)],
+    ['replication-quorums', { readQuorum: 3, writeQuorum: 3, failedReplicas: 2 }, () => runReplicationLab(3, 3, 2)],
+    ['lsm-compaction', { memtableLimit: 2, compaction: 0 }, () => runLsmLab(2, 0)],
+    ['lsm-compaction', { memtableLimit: 6, compaction: 1 }, () => runLsmLab(6, 1)],
+    ['two-phase-commit', { crashPoint: 2, rejectVote: 0 }, () => runTwoPhaseCommitLab(2, 0)],
+    ['two-phase-commit', { crashPoint: 0, rejectVote: 1 }, () => runTwoPhaseCommitLab(0, 1)],
+    ['stream-watermarks', { watermarkLag: 0, allowedLateness: 0 }, () => runStreamWatermarkLab(0, 0)],
+    ['stream-watermarks', { watermarkLag: 20, allowedLateness: 20 }, () => runStreamWatermarkLab(20, 20)],
+  ] as const)('forwards every data-systems control for %s', async (experimentId, params, expected) => {
+    const response = await post('/api/experiments/run', { experimentId, params });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: unknown };
+    expect(body.data).toEqual(expected());
+  });
+
+  const dataControls = [
+    ['replication-quorums', 'readQuorum', 1, 3],
+    ['replication-quorums', 'writeQuorum', 1, 3],
+    ['replication-quorums', 'failedReplicas', 0, 2],
+    ['lsm-compaction', 'memtableLimit', 2, 6],
+    ['lsm-compaction', 'compaction', 0, 1],
+    ['two-phase-commit', 'crashPoint', 0, 2],
+    ['two-phase-commit', 'rejectVote', 0, 1],
+    ['stream-watermarks', 'watermarkLag', 0, 20],
+    ['stream-watermarks', 'allowedLateness', 0, 20],
+  ] as const;
+  it.each(dataControls)('rejects invalid %s %s values at the HTTP boundary', async (experimentId, key, min, max) => {
+    for (const value of [min - 1, max + 1, min + 0.5, String(min), null, true]) {
+      const response = await post('/api/experiments/run', { experimentId, params: { [key]: value } });
+      expect(response.status, `${key}=${JSON.stringify(value)}`).toBe(400);
+      expect(await response.json()).toEqual({ error: expect.stringContaining(key) });
+    }
   });
 
   it.each([null, [], {}, { experimentId: 5 }, { experimentId: 'event-loop', params: null },

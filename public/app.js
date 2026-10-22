@@ -294,12 +294,16 @@ const completedTopics = new Set(Array.isArray(savedLearning.completed)
 // Default current experiment
 let currentExpKey = 'event-loop';
 let selectionVersion = 0;
+let activeRun = null;
+// Successful result snapshots live only in this tab; learning progress is separate.
+const previousRuns = new Map();
 
 // DOM Elements
 const expCategoryEl = document.getElementById('exp-category');
 const expTitleEl = document.getElementById('exp-title');
 const expDescEl = document.getElementById('exp-desc');
 const controlsContainer = document.getElementById('controls-container');
+const scenarioContainer = document.getElementById('scenario-container');
 const runBtn = document.getElementById('run-btn');
 const metricsGrid = document.getElementById('metrics-cards');
 const stageViewport = document.getElementById('stage-viewport');
@@ -447,7 +451,7 @@ document.querySelectorAll('.nav-item').forEach((item) => {
 
 function selectExperiment(key) {
   if (!navItems.some(item => item.dataset.exp === key)) return;
-  selectionVersion++;
+  resetRunDisplay();
   document.querySelectorAll('.nav-item').forEach(item => {
     const selected = item.dataset.exp === key;
     item.classList.toggle('active', selected);
@@ -483,6 +487,13 @@ function selectExperiment(key) {
     cluster.addEventListener('change', boundVoters);
     boundVoters();
   }
+  scenarioContainer.hidden = !cfg.scenarios;
+  scenarioContainer.innerHTML = cfg.scenarios
+    ? '<div class="scenario-heading"><h3>Explore a scenario</h3><span>Apply settings, predict, then run.</span></div><div class="scenario-buttons">'
+      + cfg.scenarios.map((scenario, index) => `<button type="button" class="secondary-btn" data-scenario="${index}" aria-pressed="false">${escapeHtml(scenario.label)}</button>`).join('')
+      + '</div><p id="scenario-expectation" role="status" aria-live="polite"></p>'
+    : '';
+  updateScenarioSelection();
   docArchitecture.innerHTML = cfg.architecture;
   docProduction.innerHTML = cfg.production;
   document.getElementById('doc-challenge').innerHTML = `<h4>Try it yourself</h4><p>${escapeHtml(cfg.challenge)}</p>`
@@ -491,13 +502,49 @@ function selectExperiment(key) {
   updateCurriculum();
   saveLearning();
 
-  // Reset stage
+}
+
+function resetRunDisplay(message = 'Predict the outcome, then run the experiment to inspect its results.') {
+  selectionVersion++;
+  activeRun?.controller.abort();
+  activeRun = null;
+  runBtn.disabled = false;
+  stageViewport.setAttribute('aria-busy', 'false');
   metricsGrid.innerHTML = '';
-  stageViewport.innerHTML = '<div class="placeholder-graphic">Predict the outcome, then run the experiment to inspect its results.</div>';
+  stageViewport.innerHTML = `<div class="placeholder-graphic">${escapeHtml(message)}</div>`;
   execStatus.textContent = 'Idle (Ready)';
   execStatus.style.color = 'var(--text-dim)';
   jsonOutput.textContent = '// Ready to run...';
 }
+
+function updateScenarioSelection() {
+  const cfg = EXPERIMENTS_CONFIG[currentExpKey];
+  if (!cfg.scenarios) return;
+  const valid = [...controlsContainer.querySelectorAll('input, select')].every(input => input.value.trim() !== '' && input.validity.valid);
+  const params = valid ? cfg.getParams() : {};
+  const selected = valid ? cfg.scenarios.findIndex(scenario => Object.entries(scenario.params).every(([key, value]) => params[key] === value)) : -1;
+  scenarioContainer.querySelectorAll('[data-scenario]').forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.scenario) === selected)));
+  document.getElementById('scenario-expectation').textContent = !valid
+    ? 'Some settings are missing or invalid. Enter valid values for all settings before running the experiment.'
+    : selected < 0
+      ? 'Custom settings. Predict the outcome, then run to test your explanation.'
+      : cfg.scenarios[selected].expectation;
+}
+
+scenarioContainer.addEventListener('click', event => {
+  const button = event.target.closest('[data-scenario]');
+  if (!button) return;
+  const scenario = EXPERIMENTS_CONFIG[currentExpKey].scenarios[Number(button.dataset.scenario)];
+  for (const [key, value] of Object.entries(scenario.params)) document.getElementById(`param-${key}`).value = String(value);
+  resetRunDisplay('Scenario settings applied. Predict the outcome, then run the experiment.');
+  updateScenarioSelection();
+});
+
+['input', 'change'].forEach(type => controlsContainer.addEventListener(type, event => {
+  if (!event.target.matches('input, select')) return;
+  resetRunDisplay('Settings changed. Run the experiment to see results for these settings.');
+  updateScenarioSelection();
+}));
 
 // Run Experiment Handler
 runBtn.addEventListener('click', async () => {
@@ -507,7 +554,17 @@ runBtn.addEventListener('click', async () => {
   const inputs = [...controlsContainer.querySelectorAll('input, select')];
   if (inputs.some(input => !input.reportValidity())) return;
   const params = cfg.getParams ? cfg.getParams() : {};
+  const settings = inputs.map(input => ({
+    key: input.id,
+    label: input.closest('.control-group')?.querySelector('label')?.textContent || input.id,
+    value: input.tagName === 'SELECT' ? input.selectedOptions[0]?.textContent : input.value,
+  }));
+  const run = { controller: new AbortController() };
+  activeRun = run;
 
+  metricsGrid.innerHTML = '';
+  stageViewport.innerHTML = '<div class="placeholder-graphic">Running the experiment with the selected settings…</div>';
+  jsonOutput.textContent = '// Waiting for this run...';
   execStatus.textContent = 'Running...';
   execStatus.style.color = 'var(--accent-yellow)';
   runBtn.disabled = true;
@@ -518,28 +575,49 @@ runBtn.addEventListener('click', async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ experimentId: key, params }),
+      signal: run.controller.signal,
     });
 
     const res = await response.json();
-    if (version !== selectionVersion) return;
+    if (version !== selectionVersion || activeRun !== run) return;
     if (!response.ok) throw new Error(res.error || `Request failed (${response.status})`);
     execStatus.textContent = `Completed in ${res.executionDurationMs}ms`;
     execStatus.style.color = 'var(--accent-green)';
     jsonOutput.textContent = JSON.stringify(res, null, 2);
 
     renderVisualStage(key, res.data, res.executionDurationMs);
+    if (ADVANCED_TOPICS[key]) {
+      const snapshot = { settings, metrics: res.data.metrics.map(metric => ({ label: metric.label, value: metric.value })) };
+      const comparison = document.createElement('section');
+      comparison.className = 'run-comparison';
+      comparison.setAttribute('aria-label', 'Run comparison');
+      comparison.innerHTML = renderRunComparison(previousRuns.get(key), snapshot);
+      stageViewport.querySelector('.result-summary').after(comparison);
+      previousRuns.set(key, snapshot);
+    }
   } catch (err) {
-    if (version !== selectionVersion) return;
+    if (version !== selectionVersion || activeRun !== run) return;
     metricsGrid.innerHTML = '';
     stageViewport.textContent = 'The experiment could not complete. See the error below.';
     execStatus.textContent = 'Error';
     execStatus.style.color = 'var(--accent-red)';
     jsonOutput.textContent = `Error executing experiment: ${err.message}`;
   } finally {
-    runBtn.disabled = false;
-    stageViewport.setAttribute('aria-busy', 'false');
+    if (activeRun === run) {
+      activeRun = null;
+      runBtn.disabled = false;
+      stageViewport.setAttribute('aria-busy', 'false');
+    }
   }
 });
+
+function renderRunComparison(previous, current) {
+  const note = '<p class="comparison-note">Successful runs of this topic only. Kept in this tab; cleared on reload.</p>';
+  const row = (label, before, after) => `<tr${previous && before !== after ? ' class="comparison-changed"' : ''}><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(before ?? '—')}</td><td>${escapeHtml(after)}</td></tr>`;
+  const settings = current.settings.map(setting => row(setting.label, previous?.settings.find(item => item.key === setting.key)?.value, setting.value)).join('');
+  const metrics = current.metrics.map(metric => row(metric.label, previous?.metrics.find(item => item.label === metric.label)?.value, metric.value)).join('');
+  return `<h4>${previous ? 'Compare your runs' : 'Your first run'}</h4>${note}<table><caption>${previous ? 'Changed values are highlighted. Compare the parameters and outcomes.' : 'Run another scenario to compare its parameters and outcomes here.'}</caption><thead><tr><th scope="col">Parameter / metric</th><th scope="col">Previous</th><th scope="col">Current</th></tr></thead><tbody>${settings}</tbody><tbody>${metrics}</tbody></table>`;
+}
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);

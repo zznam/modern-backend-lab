@@ -22,6 +22,10 @@ import { runEventSourcingLab } from './05-advanced-systems/event-sourcing.js';
 import { runSnapshotLab } from './05-advanced-systems/snapshot-isolation.js';
 import { runBackpressureLab } from './05-advanced-systems/backpressure.js';
 import { runSloLab } from './05-advanced-systems/slo-burn.js';
+import { runReplicationLab } from './05-advanced-systems/replication-quorums.js';
+import { runLsmLab } from './05-advanced-systems/lsm-compaction.js';
+import { runTwoPhaseCommitLab } from './05-advanced-systems/two-phase-commit.js';
+import { runStreamWatermarkLab } from './05-advanced-systems/stream-watermarks.js';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -56,10 +60,14 @@ Choose an experiment to run:
 17. [Advanced] Snapshot Isolation & Write Skew
 18. [Advanced] Backpressure & Load Shedding
 19. [Advanced] SLO Error Budgets & Multiwindow Burn Rates
+20. [Advanced] Replication Quorums & Read Repair
+21. [Advanced] LSM Trees, Tombstones & Compaction
+22. [Advanced] Two-Phase Commit & Coordinator Recovery
+23. [Advanced] Event-Time Windows, Watermarks & Late Data
 
 q. Quit
 ----------------------------------------------------------------
-Enter selection (1-19 or q): `;
+Enter selection (1-23 or q): `;
 
 async function handleSelection(choice: string): Promise<void> {
   console.log('\n⏳ Running experiment...\n');
@@ -72,6 +80,10 @@ async function handleSelection(choice: string): Promise<void> {
     case '17': console.log(JSON.stringify(runSnapshotLab(), null, 2)); break;
     case '18': console.log(JSON.stringify(runBackpressureLab(), null, 2)); break;
     case '19': console.log(JSON.stringify(runSloLab(), null, 2)); break;
+    case '20': console.log(JSON.stringify(runReplicationLab(), null, 2)); break;
+    case '21': console.log(JSON.stringify(runLsmLab(), null, 2)); break;
+    case '22': console.log(JSON.stringify(runTwoPhaseCommitLab(), null, 2)); break;
+    case '23': console.log(JSON.stringify(runStreamWatermarkLab(), null, 2)); break;
     case '1': {
       const res = await runEventLoopExperiment();
       console.log('📊 Event Loop Execution Trace:');
@@ -175,7 +187,7 @@ async function handleSelection(choice: string): Promise<void> {
       rl.close();
       return;
     default:
-      throw new Error('Invalid option. Please select 1-19 or q.');
+      throw new Error('Invalid option. Please select 1-23 or q.');
   }
 
   const duration = Math.round((performance.now() - start) * 10) / 10;
