@@ -1,14 +1,14 @@
 /**
  * Dual-Mode Database & Cache Adapters
  * Provides seamless dual-mode execution:
- * 1. Real PostgreSQL (via 'pg' Pool) when DATABASE_URL is set; falls back to in-memory ACID store.
- * 2. Real Redis (via 'ioredis') when REDIS_URL is set; falls back to in-memory Redis simulator.
+ * 1. Real PostgreSQL (via 'pg' Pool) when DATABASE_URL is set; uses an in-memory ACID store only when unconfigured.
+ * 2. Real Redis (via 'ioredis') when REDIS_URL is set; uses an in-memory Redis simulator only when unconfigured.
  */
 import pg from 'pg';
 import { Redis } from 'ioredis';
 import crypto from 'node:crypto';
 import { RedisEngineSimulator } from '../polyglot-storage/polyglot-manager.js';
-import { AcidSimulator, AccountRecord } from '../rdbms-acid/acid-transactions.js';
+import { AcidSimulator } from '../rdbms-acid/acid-transactions.js';
 
 export interface AdapterHealthStatus {
   service: 'PostgreSQL' | 'Redis';
@@ -19,6 +19,13 @@ export interface AdapterHealthStatus {
   error?: string;
 }
 
+function safeEndpoint(raw: string): string {
+  try {
+    const url = new URL(raw);
+    return `${url.protocol}//${url.host}${url.pathname}`;
+  } catch { return 'invalid-endpoint'; }
+}
+
 // ========================================================
 // 1. DUAL-MODE POSTGRESQL ADAPTER
 // ========================================================
@@ -27,6 +34,7 @@ export class DualModePostgresAdapter {
   private inMemoryFallback: AcidSimulator;
   private databaseUrl?: string;
   private isConnected = false;
+  private schemaReady = false;
 
   constructor(databaseUrl?: string) {
     this.databaseUrl = databaseUrl || process.env.DATABASE_URL;
@@ -37,6 +45,8 @@ export class DualModePostgresAdapter {
         this.pool = new pg.Pool({
           connectionString: this.databaseUrl,
           connectionTimeoutMillis: 3000,
+          query_timeout: 3000,
+          statement_timeout: 3000,
           max: 10,
         });
 
@@ -51,7 +61,7 @@ export class DualModePostgresAdapter {
   }
 
   public getMode(): 'LIVE_DATABASE' | 'IN_MEMORY_FALLBACK' {
-    return this.pool && this.isConnected ? 'LIVE_DATABASE' : 'IN_MEMORY_FALLBACK';
+    return this.databaseUrl ? 'LIVE_DATABASE' : 'IN_MEMORY_FALLBACK';
   }
 
   public async initSchema(): Promise<void> {
@@ -68,21 +78,20 @@ export class DualModePostgresAdapter {
             version INT NOT NULL DEFAULT 1
           );
         `);
-        // Seed default accounts if empty
-        const countRes = await client.query('SELECT COUNT(*) FROM accounts');
-        if (parseInt(countRes.rows[0].count, 10) === 0) {
-          await client.query(`
-            INSERT INTO accounts (id, name, balance, version) VALUES
-              ('acc_alice', 'Alice', 1000, 1),
-              ('acc_bob', 'Bob', 500, 1);
-          `);
-        }
+        // Concurrent app replicas may initialize the same database.
+        await client.query(`
+          INSERT INTO accounts (id, name, balance, version) VALUES
+            ('acc_alice', 'Alice', 1000, 1), ('acc_bob', 'Bob', 500, 1)
+          ON CONFLICT (id) DO NOTHING;
+        `);
         this.isConnected = true;
+        this.schemaReady = true;
       } finally {
         client.release();
       }
     } catch {
       this.isConnected = false;
+      this.schemaReady = false;
     }
   }
 
@@ -94,8 +103,10 @@ export class DualModePostgresAdapter {
         return result;
       } catch (err) {
         this.isConnected = false;
+        throw err;
       }
     }
+    if (this.databaseUrl) throw new Error('PostgreSQL is configured but unavailable');
 
     // In-memory simulation fallback
     return {
@@ -113,53 +124,40 @@ export class DualModePostgresAdapter {
     amount: number,
     simulateCrashAtStep = 0
   ): Promise<{ success: boolean; rolledBack: boolean; balances: Record<string, number>; reason: string; mode: string }> {
-    if (this.pool && simulateCrashAtStep === 0) {
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Amount must be finite and positive');
+    if (fromId === toId) throw new Error('Sender and recipient must differ');
+    if (this.pool) {
+      const client = await this.pool.connect();
+      let committed = false;
       try {
-        const client = await this.pool.connect();
-        try {
-          await client.query('BEGIN');
-
-          const fromRes = await client.query('SELECT balance FROM accounts WHERE id = $1 FOR UPDATE', [fromId]);
-          if (fromRes.rows.length === 0 || Number(fromRes.rows[0].balance) < amount) {
-            await client.query('ROLLBACK');
-            throw new Error('Insufficient funds or account missing');
-          }
-
-          await client.query('UPDATE accounts SET balance = balance - $1, version = version + 1 WHERE id = $2', [amount, fromId]);
-          await client.query('UPDATE accounts SET balance = balance + $1, version = version + 1 WHERE id = $2', [amount, toId]);
-
-          await client.query('COMMIT');
-
-          const finalBalances = await client.query('SELECT id, balance FROM accounts WHERE id IN ($1, $2)', [fromId, toId]);
-          const balances: Record<string, number> = {};
-          finalBalances.rows.forEach((r) => {
-            balances[r.id] = Number(r.balance);
-          });
-
-          this.isConnected = true;
-          return {
-            success: true,
-            rolledBack: false,
-            balances,
-            reason: 'PostgreSQL ACID transaction committed with SELECT ... FOR UPDATE pessimistic lock.',
-            mode: 'LIVE_DATABASE',
-          };
-        } catch (err: any) {
-          await client.query('ROLLBACK');
-          return {
-            success: false,
-            rolledBack: true,
-            balances: {},
-            reason: `PostgreSQL Transaction Rolled Back: ${err.message}`,
-            mode: 'LIVE_DATABASE',
-          };
-        } finally {
-          client.release();
-        }
-      } catch {
-        this.isConnected = false;
+        await client.query('BEGIN');
+        // Lock both accounts in stable order to avoid reciprocal-transfer deadlocks.
+        const accounts = await client.query('SELECT id, balance FROM accounts WHERE id IN ($1, $2) ORDER BY id FOR UPDATE', [fromId, toId]);
+        const from = accounts.rows.find(row => row.id === fromId);
+        const to = accounts.rows.find(row => row.id === toId);
+        if (!from || !to) throw new Error('Account not found');
+        if (Number(from.balance) < amount) throw new Error('Insufficient funds');
+        await client.query('UPDATE accounts SET balance = balance - $1, version = version + 1 WHERE id = $2', [amount, fromId]);
+        if (simulateCrashAtStep === 1) throw new Error('Simulated crash after debit');
+        await client.query('UPDATE accounts SET balance = balance + $1, version = version + 1 WHERE id = $2', [amount, toId]);
+        if (simulateCrashAtStep === 2) throw new Error('Simulated crash after credit');
+        const finalBalances = await client.query('SELECT id, balance FROM accounts WHERE id IN ($1, $2)', [fromId, toId]);
+        await client.query('COMMIT');
+        committed = true;
+        this.isConnected = true;
+        return { success: true, rolledBack: false,
+          balances: Object.fromEntries(finalBalances.rows.map(row => [row.id, Number(row.balance)])),
+          reason: 'PostgreSQL ACID transaction committed with ordered row locks.', mode: 'LIVE_DATABASE' };
+      } catch (err) {
+        // Never execute a second transfer against unrelated in-memory data after a live failure.
+        if (!committed) await client.query('ROLLBACK');
+        return { success: false, rolledBack: !committed, balances: {},
+          reason: `PostgreSQL transaction failed: ${err instanceof Error ? err.message : String(err)}`, mode: 'LIVE_DATABASE' };
+      } finally {
+        client.release();
       }
     }
+    if (this.databaseUrl) throw new Error('PostgreSQL is configured but unavailable');
 
     // In-Memory Fallback
     const simResult = await this.inMemoryFallback.executeAtomicTransfer(fromId, toId, amount, simulateCrashAtStep);
@@ -170,9 +168,9 @@ export class DualModePostgresAdapter {
   }
 
   public async healthCheck(): Promise<AdapterHealthStatus> {
-    const endpoint = this.databaseUrl ? this.databaseUrl.replace(/:[^:]*@/, ':***@') : undefined;
+    const endpoint = this.databaseUrl ? safeEndpoint(this.databaseUrl) : undefined;
 
-    if (!this.pool || !this.databaseUrl) {
+    if (!this.databaseUrl) {
       return {
         service: 'PostgreSQL',
         mode: 'IN_MEMORY_FALLBACK',
@@ -183,7 +181,10 @@ export class DualModePostgresAdapter {
 
     const start = performance.now();
     try {
-      await this.pool.query('SELECT 1');
+      if (!this.pool) throw new Error('PostgreSQL client is unavailable');
+      if (!this.schemaReady) await this.initSchema();
+      if (!this.schemaReady) throw new Error('PostgreSQL schema initialization is incomplete');
+      await this.pool.query('SELECT 1 FROM accounts LIMIT 1');
       this.isConnected = true;
       return {
         service: 'PostgreSQL',
@@ -196,10 +197,10 @@ export class DualModePostgresAdapter {
       this.isConnected = false;
       return {
         service: 'PostgreSQL',
-        mode: 'IN_MEMORY_FALLBACK',
+        mode: 'LIVE_DATABASE',
         status: 'DISCONNECTED',
         endpoint,
-        error: err.message,
+        error: 'Configured service is unavailable',
       };
     }
   }
@@ -219,6 +220,7 @@ export class DualModeRedisAdapter {
   private client: Redis | null = null;
   private inMemoryFallback: RedisEngineSimulator;
   private redisUrl?: string;
+  private connectionPromise: Promise<boolean> | null = null;
   private isConnected = false;
 
   constructor(redisUrl?: string) {
@@ -230,11 +232,12 @@ export class DualModeRedisAdapter {
         this.client = new Redis(this.redisUrl, {
           lazyConnect: true,
           connectTimeout: 2000,
+          commandTimeout: 2000,
           maxRetriesPerRequest: 1,
           retryStrategy: () => null, // Do not spam retries on reconnect
         });
 
-        this.client.on('connect', () => {
+        this.client.on('ready', () => {
           this.isConnected = true;
         });
 
@@ -248,54 +251,72 @@ export class DualModeRedisAdapter {
   }
 
   public getMode(): 'LIVE_DATABASE' | 'IN_MEMORY_FALLBACK' {
-    return this.client && this.isConnected ? 'LIVE_DATABASE' : 'IN_MEMORY_FALLBACK';
+    return this.redisUrl ? 'LIVE_DATABASE' : 'IN_MEMORY_FALLBACK';
   }
 
   public async connect(): Promise<boolean> {
     if (!this.client) return false;
-    try {
-      await this.client.connect();
-      this.isConnected = true;
-      return true;
-    } catch {
-      this.isConnected = false;
-      return false;
-    }
+    if (this.client.status === 'ready') return true;
+    if (this.connectionPromise) return this.connectionPromise;
+    this.connectionPromise = (async () => {
+      try {
+        await this.client!.connect();
+        this.isConnected = true;
+        return true;
+      } catch {
+        this.isConnected = false;
+        return false;
+      }
+    })();
+    try { return await this.connectionPromise; }
+    finally { this.connectionPromise = null; }
+  }
+
+  private async requireConnection(): Promise<void> {
+    if (!await this.connect()) throw new Error('Redis is configured but unavailable');
   }
 
   public async set(key: string, value: any, ttlSeconds?: number): Promise<void> {
-    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    if (ttlSeconds !== undefined && (!Number.isSafeInteger(ttlSeconds) || ttlSeconds <= 0)) throw new Error('TTL must be a positive integer in seconds');
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) throw new Error('Value must be JSON serializable');
 
-    if (this.client && this.isConnected) {
+    if (this.client) {
       try {
-        if (ttlSeconds) {
+        await this.requireConnection();
+        if (ttlSeconds !== undefined) {
           await this.client.set(key, serialized, 'EX', ttlSeconds);
         } else {
           await this.client.set(key, serialized);
         }
         return;
-      } catch {
+      } catch (err) {
         this.isConnected = false;
+        throw err;
       }
     }
+    if (this.redisUrl) throw new Error('Redis is configured but unavailable');
 
-    this.inMemoryFallback.set(key, value, ttlSeconds);
+    this.inMemoryFallback.set(key, JSON.parse(serialized), ttlSeconds);
   }
 
   public async get(key: string): Promise<any | null> {
-    if (this.client && this.isConnected) {
+    if (this.client) {
       try {
+        await this.requireConnection();
         const raw = await this.client.get(key);
-        if (!raw) return null;
+        if (raw === null) return null;
         try {
           return JSON.parse(raw);
         } catch {
           return raw;
         }
-      } catch {
+      } catch (err) {
         this.isConnected = false;
+        throw err;
       }
     }
+    if (this.redisUrl) throw new Error('Redis is configured but unavailable');
 
     return this.inMemoryFallback.get(key);
   }
@@ -304,12 +325,14 @@ export class DualModeRedisAdapter {
     resourceKey: string,
     ttlMs = 5000
   ): Promise<{ acquired: boolean; lockToken?: string; expiresAt?: number; mode: string }> {
+    if (!Number.isFinite(ttlMs) || ttlMs <= 0) throw new Error('Lock TTL must be positive');
     const lockKey = `lock:${resourceKey}`;
     const lockToken = crypto.randomUUID();
 
-    if (this.client && this.isConnected) {
+    if (this.client) {
       try {
-        // Atomic Redlock pattern via SET NX PX
+        await this.requireConnection();
+        // Single-instance lock via SET NX PX
         const result = await this.client.set(lockKey, lockToken, 'PX', ttlMs, 'NX');
         if (result === 'OK') {
           return {
@@ -320,10 +343,12 @@ export class DualModeRedisAdapter {
           };
         }
         return { acquired: false, mode: 'LIVE_DATABASE' };
-      } catch {
+      } catch (err) {
         this.isConnected = false;
+        throw err;
       }
     }
+    if (this.redisUrl) throw new Error('Redis is configured but unavailable');
 
     const sim = this.inMemoryFallback.acquireDistributedLock(resourceKey, ttlMs);
     return {
@@ -335,8 +360,9 @@ export class DualModeRedisAdapter {
   public async releaseDistributedLock(resourceKey: string, lockToken: string): Promise<{ released: boolean; mode: string }> {
     const lockKey = `lock:${resourceKey}`;
 
-    if (this.client && this.isConnected) {
+    if (this.client) {
       try {
+        await this.requireConnection();
         // Atomic release via Lua script (check token before DEL)
         const luaScript = `
           if redis.call("get", KEYS[1]) == ARGV[1] then
@@ -347,24 +373,29 @@ export class DualModeRedisAdapter {
         `;
         const res = await this.client.eval(luaScript, 1, lockKey, lockToken);
         return { released: res === 1, mode: 'LIVE_DATABASE' };
-      } catch {
+      } catch (err) {
         this.isConnected = false;
+        throw err;
       }
     }
+    if (this.redisUrl) throw new Error('Redis is configured but unavailable');
 
     const simReleased = this.inMemoryFallback.releaseDistributedLock(resourceKey, lockToken);
     return { released: simReleased, mode: 'IN_MEMORY_FALLBACK' };
   }
 
   public async zadd(leaderboardKey: string, score: number, member: string): Promise<void> {
-    if (this.client && this.isConnected) {
+    if (this.client) {
       try {
+        await this.requireConnection();
         await this.client.zadd(leaderboardKey, score, member);
         return;
-      } catch {
+      } catch (err) {
         this.isConnected = false;
+        throw err;
       }
     }
+    if (this.redisUrl) throw new Error('Redis is configured but unavailable');
 
     this.inMemoryFallback.zadd(leaderboardKey, score, member);
   }
@@ -373,8 +404,11 @@ export class DualModeRedisAdapter {
     leaderboardKey: string,
     topN = 5
   ): Promise<Array<{ rank: number; member: string; score: number }>> {
-    if (this.client && this.isConnected) {
+    if (!Number.isInteger(topN) || topN < 0) throw new Error('topN must be a nonnegative integer');
+    if (topN === 0) return [];
+    if (this.client) {
       try {
+        await this.requireConnection();
         const raw = await this.client.zrevrange(leaderboardKey, 0, topN - 1, 'WITHSCORES');
         const results: Array<{ rank: number; member: string; score: number }> = [];
         for (let i = 0; i < raw.length; i += 2) {
@@ -385,16 +419,18 @@ export class DualModeRedisAdapter {
           });
         }
         return results;
-      } catch {
+      } catch (err) {
         this.isConnected = false;
+        throw err;
       }
     }
+    if (this.redisUrl) throw new Error('Redis is configured but unavailable');
 
     return this.inMemoryFallback.zrevrange(leaderboardKey, topN);
   }
 
   public async healthCheck(): Promise<AdapterHealthStatus> {
-    if (!this.client || !this.redisUrl) {
+    if (!this.redisUrl) {
       return {
         service: 'Redis',
         mode: 'IN_MEMORY_FALLBACK',
@@ -405,26 +441,24 @@ export class DualModeRedisAdapter {
 
     const start = performance.now();
     try {
-      if (!this.isConnected) {
-        await this.connect();
-      }
-      await this.client.ping();
+      await this.requireConnection();
+      await this.client!.ping();
       this.isConnected = true;
       return {
         service: 'Redis',
         mode: 'LIVE_DATABASE',
         status: 'CONNECTED',
-        endpoint: this.redisUrl,
+        endpoint: safeEndpoint(this.redisUrl),
         latencyMs: Math.round((performance.now() - start) * 100) / 100,
       };
     } catch (err: any) {
       this.isConnected = false;
       return {
         service: 'Redis',
-        mode: 'IN_MEMORY_FALLBACK',
+        mode: 'LIVE_DATABASE',
         status: 'DISCONNECTED',
-        endpoint: this.redisUrl,
-        error: err.message,
+        endpoint: safeEndpoint(this.redisUrl),
+        error: 'Configured service is unavailable',
       };
     }
   }

@@ -1,6 +1,6 @@
 /**
  * Event Loop Mechanics Demo
- * Demonstrates the precise execution order of Node.js Event Loop phases:
+ * Records observed execution order; ESM and microtask context can change nextTick/Promise ordering:
  * 1. Microtask Queue: process.nextTick (highest priority) -> Promise.then / queueMicrotask
  * 2. Macrotask Queue: Timers (setTimeout/setInterval) -> I/O poll -> setImmediate (Check phase)
  */
@@ -69,7 +69,7 @@ export async function runEventLoopExperiment(): Promise<{
         'Next Tick Queue',
         'microtask',
         'process.nextTick(...)',
-        'Runs immediately after the current synchronous operation finishes, before any Promise microtasks or event loop phases.'
+        'Runs when Node drains the nextTick queue. Ordinary callbacks drain this before Promise microtasks; ESM evaluation or an existing microtask can change their relative order.'
       );
     });
 
@@ -79,7 +79,7 @@ export async function runEventLoopExperiment(): Promise<{
         'Promise Microtask Queue',
         'microtask',
         'Promise.resolve().then(...)',
-        'Microtasks run after nextTick queue, before the event loop advances to the next phase.'
+        'Runs at the Promise microtask checkpoint before the next event-loop phase. Its order relative to nextTick depends on the calling context.'
       );
     });
 
@@ -92,8 +92,9 @@ export async function runEventLoopExperiment(): Promise<{
     explanation: {
       'Call Stack': 'Synchronous execution runs to completion before event loop checks any queue.',
       'process.nextTick': 'Not part of libuv loop itself; processed immediately after current tick completes.',
-      'Promise Microtasks': 'Drained completely after nextTick and before next macrotask phase.',
+      'Promise Microtasks': 'Drained at microtask checkpoints; ESM evaluation itself runs in the microtask queue.',
       'Timers (setTimeout)': 'Libuv timers min-heap checked when time threshold is reached.',
+      'Ordering': 'Timers and immediates have no universal ordering outside an I/O callback; this trace reports the actual run.',
       'Check (setImmediate)': 'Designed to execute scripts immediately once I/O poll phase completes.',
     },
   };

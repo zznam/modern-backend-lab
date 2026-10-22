@@ -11,10 +11,10 @@ const EXPERIMENTS_CONFIG = {
     controlsHtml: '',
     architecture: `
       <h4>How the Node.js Event Loop Works</h4>
-      <p>Node.js runs single-threaded JavaScript using the <strong>libuv</strong> event loop. The execution order is deterministic:</p>
+      <p>Node.js runs single-threaded JavaScript using the <strong>libuv</strong> event loop. The trace records the observed execution order:</p>
       <ul>
         <li><strong>Call Stack:</strong> Synchronous execution always runs first to completion.</li>
-        <li><strong>Microtasks Queue:</strong> Drained immediately when the call stack becomes empty. <code>process.nextTick</code> executes before <code>Promise.then</code> callbacks.</li>
+        <li><strong>Microtasks Queue:</strong> Drained at runtime checkpoints after synchronous work. <code>process.nextTick</code> usually runs before Promise callbacks after ordinary callbacks. ESM evaluation and calls inside an existing microtask can produce a different observed order.</li>
         <li><strong>Timers Phase:</strong> Libuv executes expired <code>setTimeout</code> and <code>setInterval</code> callbacks.</li>
         <li><strong>I/O Poll Phase:</strong> Retrieves incoming network packets and OS events via <code>epoll</code> / <code>kqueue</code>.</li>
         <li><strong>Check Phase:</strong> Executes <code>setImmediate</code> callbacks.</li>
@@ -123,7 +123,7 @@ const EXPERIMENTS_CONFIG = {
   'cache-stampede': {
     category: '3. Architecture & Distributed',
     title: 'Cache Stampede (Thundering Herd) & Singleflight Mutex',
-    desc: 'Demonstrates what happens when a hot cache key expires under 50 concurrent requests: 50 simultaneous database hits vs exactly 1 query with Singleflight locking.',
+    desc: 'Compare simultaneous database hits when a hot cache key expires with a single shared query using Singleflight locking. Choose the number of concurrent requests below.',
     controlsHtml: `
       <div class="control-group">
         <label>Concurrent Requests:</label>
@@ -260,8 +260,40 @@ const EXPERIMENTS_CONFIG = {
   },
 };
 
+// Every navigation item has learning material, including the original labs.
+const navItems = [...document.querySelectorAll('.nav-item')];
+for (const item of navItems) {
+  const key = item.dataset.exp;
+  const guide = TOPIC_GUIDES[key];
+  const advanced = ADVANCED_TOPICS[key];
+  EXPERIMENTS_CONFIG[key] = {
+    category: item.closest('.nav-section').querySelector('.section-title').textContent,
+    title: item.textContent.trim(),
+    desc: guide?.[2],
+    level: guide?.[0] || 'advanced',
+    prerequisites: guide?.[1] || [],
+    objective: guide?.[2],
+    controlsHtml: '',
+    architecture: `<h4>Mechanics to observe</h4><p>${guide?.[3] || ''}</p>`,
+    production: `<h4>Production considerations</h4><p>${guide?.[4] || ''}</p>`,
+    challenge: 'Before running, predict the result. Inspect the payload, explain the mechanism, and identify one boundary of this teaching model.',
+    ...EXPERIMENTS_CONFIG[key],
+    ...advanced,
+  };
+}
+
+const STORAGE_KEY = 'backend-lab-learning-v1';
+let savedLearning = {};
+try {
+  const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) savedLearning = parsed;
+} catch { /* A blocked or corrupt store must not prevent learning. */ }
+const completedTopics = new Set(Array.isArray(savedLearning.completed)
+  ? savedLearning.completed.filter(key => navItems.some(item => item.dataset.exp === key)) : []);
+
 // Default current experiment
 let currentExpKey = 'event-loop';
+let selectionVersion = 0;
 
 // DOM Elements
 const expCategoryEl = document.getElementById('exp-category');
@@ -275,14 +307,132 @@ const execStatus = document.getElementById('exec-status');
 const jsonOutput = document.getElementById('json-output');
 const docArchitecture = document.getElementById('doc-architecture');
 const docProduction = document.getElementById('doc-production');
+const pathSelect = document.getElementById('learning-path');
+const levelSelect = document.getElementById('topic-level');
+const statusSelect = document.getElementById('topic-status');
+const searchInput = document.getElementById('topic-search');
+const completeBtn = document.getElementById('mark-complete');
+const nextBtn = document.getElementById('next-topic');
+
+function pathTopics() {
+  return LEARNING_PATHS[pathSelect.value]?.topics || navItems.map(item => item.dataset.exp);
+}
+
+function saveLearning() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: [...completedTopics], lastTopic: currentExpKey, path: pathSelect.value }));
+  } catch {
+    document.querySelector('.local-note').textContent = 'Session only';
+  }
+}
+
+function updateCurriculum() {
+  const topics = pathTopics();
+  const done = topics.filter(key => completedTopics.has(key)).length;
+  const progress = document.getElementById('learning-progress');
+  progress.max = topics.length;
+  progress.value = done;
+  document.getElementById('progress-label').textContent = `${done} of ${topics.length} completed`;
+  document.getElementById('topic-total').textContent = `${navItems.length} labs`;
+  const path = LEARNING_PATHS[pathSelect.value];
+  document.getElementById('path-description').textContent = path
+    ? `${path.label}: ${topics.length} labs in a recommended sequence. Use Next topic to continue.`
+    : 'Explore freely or choose a guided sequence.';
+  const query = searchInput.value.trim().toLowerCase();
+  let visible = 0;
+  for (const item of navItems) {
+    const key = item.dataset.exp;
+    const cfg = EXPERIMENTS_CONFIG[key];
+    const matches = topics.includes(key)
+      && (levelSelect.value === 'all' || cfg.level === levelSelect.value)
+      && (statusSelect.value === 'all' || completedTopics.has(key) === (statusSelect.value === 'completed'))
+      && `${cfg.title} ${cfg.desc} ${cfg.category} ${cfg.objective} ${cfg.architecture}`.toLowerCase().includes(query);
+    item.hidden = !matches;
+    item.classList.toggle('completed', completedTopics.has(key));
+    item.setAttribute('aria-label', `${cfg.title}${completedTopics.has(key) ? ', completed' : ''}`);
+    if (matches) visible++;
+  }
+  document.querySelectorAll('.nav-section').forEach(section => {
+    section.hidden = ![...section.querySelectorAll('.nav-item')].some(item => !item.hidden);
+  });
+  document.getElementById('no-topics').hidden = visible > 0;
+  document.getElementById('filter-count').textContent = `${visible} of ${topics.length} topics shown`;
+  completeBtn.setAttribute('aria-pressed', String(completedTopics.has(currentExpKey)));
+  completeBtn.textContent = completedTopics.has(currentExpKey) ? '✓ Completed · undo' : 'Mark complete';
+  const currentIndex = topics.indexOf(currentExpKey);
+  const next = currentIndex < 0 ? topics[0] : topics[currentIndex + 1];
+  nextBtn.disabled = !next;
+  nextBtn.textContent = next ? 'Next topic →' : 'Path finished';
+  nextBtn.dataset.next = next || '';
+}
+
+[pathSelect, levelSelect, statusSelect].forEach(select => select.addEventListener('change', () => {
+  updateCurriculum(); saveLearning();
+}));
+searchInput.addEventListener('input', updateCurriculum);
+document.getElementById('clear-filters').addEventListener('click', () => {
+  searchInput.value = '';
+  pathSelect.value = levelSelect.value = statusSelect.value = 'all';
+  updateCurriculum(); saveLearning();
+});
+completeBtn.addEventListener('click', () => {
+  if (completedTopics.has(currentExpKey)) completedTopics.delete(currentExpKey);
+  else completedTopics.add(currentExpKey);
+  updateCurriculum(); saveLearning();
+});
+nextBtn.addEventListener('click', () => {
+  if (nextBtn.dataset.next) selectExperiment(nextBtn.dataset.next);
+});
+document.getElementById('prerequisites').addEventListener('click', event => {
+  const link = event.target.closest('[data-topic]');
+  if (link) selectExperiment(link.dataset.topic);
+});
+document.getElementById('copy-link').addEventListener('click', async () => {
+  const feedback = document.getElementById('link-feedback');
+  try {
+    await navigator.clipboard.writeText(location.href);
+    feedback.textContent = 'Link copied';
+  } catch { feedback.textContent = 'Copy the topic URL from the address bar.'; }
+});
+
+function hashTopic() {
+  try { return decodeURIComponent(location.hash.slice(1)); } catch { return ''; }
+}
+window.addEventListener('hashchange', () => {
+  const key = hashTopic();
+  if (navItems.some(item => item.dataset.exp === key) && key !== currentExpKey) selectExperiment(key);
+});
 
 // Tab Switching
-document.querySelectorAll('.tab-btn').forEach((btn) => {
+const tabButtons = [...document.querySelectorAll('.tab-btn')];
+document.querySelector('.tab-bar').setAttribute('role', 'tablist');
+document.querySelector('.tab-bar').setAttribute('aria-label', 'Experiment details');
+tabButtons.forEach((btn, index) => {
+  const panel = document.getElementById(`tab-${btn.dataset.tab}`);
+  btn.id = `tab-button-${btn.dataset.tab}`;
+  btn.setAttribute('role', 'tab');
+  btn.setAttribute('aria-controls', panel.id);
+  btn.setAttribute('aria-selected', String(index === 0));
+  btn.tabIndex = index === 0 ? 0 : -1;
+  panel.setAttribute('role', 'tabpanel');
+  panel.setAttribute('aria-labelledby', btn.id);
+  panel.tabIndex = 0;
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+    tabButtons.forEach(b => {
+      b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); b.tabIndex = -1;
+    });
     document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
     btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    btn.tabIndex = 0;
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+  });
+  btn.addEventListener('keydown', event => {
+    const offsets = { ArrowRight: 1, ArrowLeft: -1, Home: -index, End: tabButtons.length - 1 - index };
+    if (!(event.key in offsets)) return;
+    event.preventDefault();
+    const target = tabButtons[(index + offsets[event.key] + tabButtons.length) % tabButtons.length];
+    target.click(); target.focus();
   });
 });
 
@@ -296,26 +446,54 @@ document.querySelectorAll('.nav-item').forEach((item) => {
 });
 
 function selectExperiment(key) {
+  if (!navItems.some(item => item.dataset.exp === key)) return;
+  selectionVersion++;
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const selected = item.dataset.exp === key;
+    item.classList.toggle('active', selected);
+    item.setAttribute('aria-pressed', String(selected));
+  });
   currentExpKey = key;
-  const cfg = EXPERIMENTS_CONFIG[key] || {
-    category: 'Learning Module',
-    title: key.replace(/-/g, ' ').toUpperCase(),
-    desc: 'Interactive backend mastery experiment.',
-    controlsHtml: '',
-    architecture: '<p>Documentation for this module is available in code.</p>',
-    production: '<p>Production guidelines available in code.</p>',
-  };
+  const cfg = EXPERIMENTS_CONFIG[key];
+  if (hashTopic() !== key) location.hash = key;
+  document.title = `${cfg.title} | Backend Lab`;
 
   expCategoryEl.textContent = cfg.category;
   expTitleEl.textContent = cfg.title;
   expDescEl.textContent = cfg.desc;
+  document.getElementById('exp-level').textContent = cfg.level;
+  document.getElementById('learning-objective').textContent = cfg.objective;
+  document.getElementById('prerequisites').innerHTML = cfg.prerequisites.length
+    ? '<span>Builds on:</span> ' + cfg.prerequisites.map(topic => `<button class="topic-link" data-topic="${topic}">${escapeHtml(EXPERIMENTS_CONFIG[topic].title)}</button>`).join('')
+    : '<span>No prerequisites · start here</span>';
+  document.getElementById('link-feedback').textContent = '';
   controlsContainer.innerHTML = cfg.controlsHtml || '<span style="color:var(--text-dim);font-size:13px;">No custom parameters required for this experiment.</span>';
+  controlsContainer.querySelectorAll('.control-group').forEach(group => {
+    const input = group.querySelector('input, select');
+    const label = group.querySelector('label');
+    if (input && label) label.htmlFor = input.id;
+  });
+  if (key === 'consensus-quorum') {
+    const cluster = document.getElementById('param-clusterSize');
+    const voters = document.getElementById('param-availableNodes');
+    const boundVoters = () => {
+      voters.max = Number(cluster.value) - 1;
+      if (Number(voters.value) > Number(voters.max)) voters.value = voters.max;
+    };
+    cluster.addEventListener('change', boundVoters);
+    boundVoters();
+  }
   docArchitecture.innerHTML = cfg.architecture;
   docProduction.innerHTML = cfg.production;
+  document.getElementById('doc-challenge').innerHTML = `<h4>Try it yourself</h4><p>${escapeHtml(cfg.challenge)}</p>`
+    + (cfg.source ? `<p>Implementation: <code>${escapeHtml(cfg.source)}</code></p>` : '')
+    + (cfg.reference ? `<p>Read more: <a href="${cfg.reference[1]}" target="_blank" rel="noopener noreferrer">${escapeHtml(cfg.reference[0])}</a></p>` : '');
+  updateCurriculum();
+  saveLearning();
 
   // Reset stage
   metricsGrid.innerHTML = '';
-  stageViewport.innerHTML = '<div class="placeholder-graphic">Click "Run Live Experiment" to observe real-time execution.</div>';
+  stageViewport.innerHTML = '<div class="placeholder-graphic">Predict the outcome, then run the experiment to inspect its results.</div>';
   execStatus.textContent = 'Idle (Ready)';
   execStatus.style.color = 'var(--text-dim)';
   jsonOutput.textContent = '// Ready to run...';
@@ -323,38 +501,59 @@ function selectExperiment(key) {
 
 // Run Experiment Handler
 runBtn.addEventListener('click', async () => {
-  const cfg = EXPERIMENTS_CONFIG[currentExpKey] || {};
+  const key = currentExpKey;
+  const version = selectionVersion;
+  const cfg = EXPERIMENTS_CONFIG[key] || {};
+  const inputs = [...controlsContainer.querySelectorAll('input, select')];
+  if (inputs.some(input => !input.reportValidity())) return;
   const params = cfg.getParams ? cfg.getParams() : {};
 
   execStatus.textContent = 'Running...';
   execStatus.style.color = 'var(--accent-yellow)';
   runBtn.disabled = true;
+  stageViewport.setAttribute('aria-busy', 'true');
 
   try {
     const response = await fetch('/api/experiments/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ experimentId: currentExpKey, params }),
+      body: JSON.stringify({ experimentId: key, params }),
     });
 
     const res = await response.json();
+    if (version !== selectionVersion) return;
+    if (!response.ok) throw new Error(res.error || `Request failed (${response.status})`);
     execStatus.textContent = `Completed in ${res.executionDurationMs}ms`;
     execStatus.style.color = 'var(--accent-green)';
     jsonOutput.textContent = JSON.stringify(res, null, 2);
 
-    renderVisualStage(currentExpKey, res.data, res.executionDurationMs);
+    renderVisualStage(key, res.data, res.executionDurationMs);
   } catch (err) {
+    if (version !== selectionVersion) return;
+    metricsGrid.innerHTML = '';
+    stageViewport.textContent = 'The experiment could not complete. See the error below.';
     execStatus.textContent = 'Error';
     execStatus.style.color = 'var(--accent-red)';
     jsonOutput.textContent = `Error executing experiment: ${err.message}`;
   } finally {
     runBtn.disabled = false;
+    stageViewport.setAttribute('aria-busy', 'false');
   }
 });
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+}
 
 // Render Visual Visualizer Stage
 function renderVisualStage(key, data, durationMs) {
   metricsGrid.innerHTML = '';
+
+  if (ADVANCED_TOPICS[key]) {
+    metricsGrid.innerHTML = data.metrics.map(metric => `<div class="metric-card"><div class="metric-label">${escapeHtml(metric.label)}</div><div class="metric-value">${escapeHtml(metric.value)}</div><div class="metric-sub">${escapeHtml(metric.hint)}</div></div>`).join('');
+    stageViewport.innerHTML = `<div class="advanced-result"><p class="result-summary">${escapeHtml(data.summary)}</p><ol class="sequence-flow trace-list">${data.steps.map((step, index) => `<li class="flow-step trace-${['ok', 'warning', 'blocked'].includes(step.state) ? step.state : 'ok'}"><span class="step-num">${index + 1}</span><div class="step-content"><div class="step-phase">${escapeHtml(step.state)}</div><div class="step-title">${escapeHtml(step.title)}</div><p class="step-desc">${escapeHtml(step.detail)}</p></div></li>`).join('')}</ol><p class="model-note"><strong>Model boundary:</strong> ${escapeHtml(data.model)}</p></div>`;
+    return;
+  }
 
   switch (key) {
     case 'event-loop': {
@@ -362,7 +561,7 @@ function renderVisualStage(key, data, durationMs) {
         <div class="metric-card">
           <div class="metric-label">Execution Time</div>
           <div class="metric-value">${durationMs} ms</div>
-          <div class="metric-sub">✓ Deterministic Phase Order</div>
+          <div class="metric-sub">✓ Observed Phase Order</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Trace Steps</div>
@@ -377,9 +576,9 @@ function renderVisualStage(key, data, durationMs) {
           <div class="flow-step">
             <div class="step-num">${step.step}</div>
             <div class="step-content">
-              <div class="step-phase">${step.phase} [${step.type}]</div>
-              <div class="step-title">${step.label}</div>
-              <div class="step-desc">${step.explanation}</div>
+              <div class="step-phase">${escapeHtml(step.phase)} [${escapeHtml(step.type)}]</div>
+              <div class="step-title">${escapeHtml(step.label)}</div>
+              <div class="step-desc">${escapeHtml(step.explanation)}</div>
             </div>
           </div>
         `;
@@ -444,7 +643,7 @@ function renderVisualStage(key, data, durationMs) {
         <div class="metric-card">
           <div class="metric-label">With Singleflight Mutex</div>
           <div class="metric-value" style="color:var(--accent-green);">${withQ} DB Query</div>
-          <div class="metric-sub">Exactly 1 DB query! 98% reduction</div>
+          <div class="metric-sub">Exactly 1 DB query! ${withoutQ ? Math.round((1 - withQ / withoutQ) * 100) : 0}% reduction</div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Penetration Defense</div>
@@ -455,7 +654,7 @@ function renderVisualStage(key, data, durationMs) {
 
       stageViewport.innerHTML = `
         <div style="width:100%;text-align:center;">
-          <div style="font-size:16px;font-weight:600;margin-bottom:16px;">Database Queries Under 50 Simultaneous Cache Misses:</div>
+          <div style="font-size:16px;font-weight:600;margin-bottom:16px;">Database Queries Under ${withoutQ} Simultaneous Cache Misses:</div>
           <div style="display:flex;align-items:flex-end;justify-content:center;gap:40px;height:140px;">
             <div style="display:flex;flex-direction:column;align-items:center;">
               <div style="background:#ef4444;width:80px;height:120px;border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;font-weight:700;">${withoutQ}</div>
@@ -556,5 +755,9 @@ function renderVisualStage(key, data, durationMs) {
   }
 }
 
-// Initialize on page load
-selectExperiment('event-loop');
+// A valid link wins over the last locally viewed topic.
+pathSelect.value = Object.hasOwn(LEARNING_PATHS, savedLearning.path) ? savedLearning.path : 'all';
+const linkedTopic = hashTopic();
+const initialTopic = navItems.some(item => item.dataset.exp === linkedTopic) ? linkedTopic
+  : navItems.some(item => item.dataset.exp === savedLearning.lastTopic) ? savedLearning.lastTopic : 'event-loop';
+selectExperiment(initialTopic);

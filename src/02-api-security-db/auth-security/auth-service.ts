@@ -4,7 +4,7 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 
-const JWT_SECRET = 'backend-mastery-lab-super-secure-jwt-secret-key-32chars';
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 
 export interface UserSession {
   sessionId: string;
@@ -17,6 +17,7 @@ export interface UserSession {
 export interface RefreshTokenRecord {
   token: string;
   familyId: string;
+  email: string;
   userId: string;
   isRevoked: boolean;
   expiresAt: number;
@@ -48,7 +49,7 @@ export class AuthService {
 
   public validateSession(sessionId: string): UserSession | null {
     const session = this.sessions.get(sessionId);
-    if (!session || session.expiresAt < Date.now()) {
+    if (!session || session.expiresAt <= Date.now()) {
       if (session) this.sessions.delete(sessionId);
       return null;
     }
@@ -80,6 +81,7 @@ export class AuthService {
     const rawRefreshToken = crypto.randomBytes(40).toString('hex');
     this.refreshTokens.set(rawRefreshToken, {
       token: rawRefreshToken,
+      email,
       familyId: activeFamily,
       userId,
       isRevoked: false,
@@ -98,7 +100,7 @@ export class AuthService {
    * If a stolen refresh token is used a second time, the ENTIRE token family is immediately revoked,
    * cutting off the attacker!
    */
-  public rotateRefreshToken(incomingRefreshToken: string, email: string): {
+  public rotateRefreshToken(incomingRefreshToken: string, _email?: string): {
     success: boolean;
     accessToken?: string;
     refreshToken?: string;
@@ -108,6 +110,11 @@ export class AuthService {
 
     if (!record) {
       return { success: false, error: 'Invalid or unknown refresh token' };
+    }
+
+    if (record.expiresAt <= Date.now()) {
+      this.refreshTokens.delete(incomingRefreshToken);
+      return { success: false, error: 'Refresh token expired' };
     }
 
     // AUTOMATIC COMPROMISE DETECTION:
@@ -129,7 +136,7 @@ export class AuthService {
     record.isRevoked = true;
 
     // Issue a brand-new token pair within the same family
-    const newTokens = this.issueTokenPair(record.userId, email, record.familyId);
+    const newTokens = this.issueTokenPair(record.userId, record.email, record.familyId);
     return {
       success: true,
       accessToken: newTokens.accessToken,

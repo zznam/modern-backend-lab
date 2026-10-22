@@ -2,7 +2,7 @@
  * Polyglot Persistence & Storage Engine Architecture
  * Demonstrates:
  * 1. Storage Selection Matrix (Relational vs NoSQL vs In-Memory vs Search/OLAP)
- * 2. Redis In-Memory Engine: Redlock Distributed Locking & Sorted Set Leaderboards
+ * 2. Redis In-Memory Engine: Ownership-Token Locking & Sorted Set Leaderboards
  * 3. Search & Analytics Engine: Inverted Index with BM25 Relevance Scoring
  * 4. Columnar OLAP Engine: Fast vectorized aggregations
  */
@@ -55,7 +55,7 @@ export function getPolyglotPersistenceMatrix(): StorageComparisonItem[] {
 }
 
 // ========================================================
-// 1. REDIS IN-MEMORY ENGINE & REDLOCK DISTRIBUTED LOCK
+// 1. REDIS IN-MEMORY ENGINE & OWNERSHIP-TOKEN LOCK
 // ========================================================
 export class RedisEngineSimulator {
   private kv = new Map<string, { value: any; expiresAt?: number }>();
@@ -77,7 +77,7 @@ export class RedisEngineSimulator {
     return item.value;
   }
 
-  // REDLOCK ALGORITHM SIMULATOR (Distributed Lock across cluster nodes)
+  // Single-instance ownership-token lock simulator (not multi-node Redlock)
   public acquireDistributedLock(
     resourceKey: string,
     ttlMs = 5000
@@ -101,9 +101,8 @@ export class RedisEngineSimulator {
 
   public releaseDistributedLock(resourceKey: string, lockToken: string): boolean {
     const lockKey = `lock:${resourceKey}`;
-    const current = this.kv.get(lockKey);
     // Atomic check: ONLY delete if token matches! (Simulates Redis Lua script)
-    if (current && (current.value === lockToken || current.value?.value === lockToken)) {
+    if (this.get(lockKey) === lockToken) {
       this.kv.delete(lockKey);
       return true;
     }
@@ -137,6 +136,14 @@ export class InvertedIndexSearchEngine {
   private index = new Map<string, Set<number>>(); // token -> docIds
 
   public indexDocument(docId: number, content: string): void {
+    const previous = this.documents.get(docId);
+    if (previous !== undefined) {
+      for (const token of this.tokenize(previous)) {
+        const postings = this.index.get(token);
+        postings?.delete(docId);
+        if (postings?.size === 0) this.index.delete(token);
+      }
+    }
     this.documents.set(docId, content);
     const tokens = this.tokenize(content);
     for (const token of tokens) {

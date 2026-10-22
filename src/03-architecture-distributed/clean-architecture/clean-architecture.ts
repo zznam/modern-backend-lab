@@ -18,6 +18,7 @@ export class Money {
   readonly currency: string;
 
   constructor(amount: number, currency: string = 'USD') {
+    if (!Number.isFinite(amount)) throw new Error('Money amount must be finite');
     if (amount < 0) throw new Error('Money amount cannot be negative');
     this.amount = Math.round(amount * 100) / 100;
     this.currency = currency;

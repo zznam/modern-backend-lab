@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: modern-backend-lab
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     environment:
       - NODE_ENV=production
       - PORT=4000
@@ -31,7 +31,7 @@ services:
       POSTGRES_PASSWORD: lab_password
       POSTGRES_DB: mastery_db
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -48,7 +48,7 @@ services:
     container_name: lab-redis
     restart: always
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redisdata:/data
     command: ["redis-server", "--appendonly", "yes"]
@@ -65,7 +65,7 @@ services:
     image: prom/prometheus:latest
     container_name: lab-prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=7d"
@@ -79,7 +79,7 @@ services:
     image: grafana/grafana:latest
     container_name: lab-grafana
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
@@ -96,8 +96,8 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     ports:
-      - "16686:16686" # Jaeger Web UI
-      - "4318:4318"   # OTLP HTTP collector endpoint
+      - "127.0.0.1:16686:16686" # Jaeger Web UI
+      - "127.0.0.1:4318:4318"   # OTLP HTTP collector endpoint
     networks:
       - backend-network
 

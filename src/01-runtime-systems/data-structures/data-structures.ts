@@ -30,7 +30,7 @@ export class LRUCache<K, V> {
   private tail: DoublyLinkedNode<K, V>;
 
   constructor(capacity: number) {
-    if (capacity <= 0) throw new Error('Capacity must be > 0');
+    if (!Number.isSafeInteger(capacity) || capacity <= 0) throw new Error('Capacity must be > 0');
     this.capacity = capacity;
     this.head = new DoublyLinkedNode(null as any, null as any);
     this.tail = new DoublyLinkedNode(null as any, null as any);
@@ -113,6 +113,7 @@ export class RingBuffer<T> {
   private count = 0;
 
   constructor(capacity: number) {
+    if (!Number.isSafeInteger(capacity) || capacity <= 0) throw new Error('Capacity must be a positive integer');
     this.capacity = capacity;
     this.buffer = new Array<T | undefined>(capacity);
   }
@@ -228,10 +229,13 @@ export class BloomFilter {
   private bitArray: Uint8Array;
 
   constructor(expectedItems: number = 1000, falsePositiveRate: number = 0.01) {
+    if (!Number.isSafeInteger(expectedItems) || expectedItems <= 0 || !Number.isFinite(falsePositiveRate) || falsePositiveRate <= 0 || falsePositiveRate >= 1) {
+      throw new Error('Expected items must be positive and false positive rate must be between 0 and 1');
+    }
     // Optimal size m = - (n * ln(p)) / (ln(2)^2)
     this.size = Math.ceil(-1 * ((expectedItems * Math.log(falsePositiveRate)) / Math.pow(Math.log(2), 2)));
     // Optimal k = (m / n) * ln(2)
-    this.hashCount = Math.round((this.size / expectedItems) * Math.log(2));
+    this.hashCount = Math.max(1, Math.round((this.size / expectedItems) * Math.log(2)));
     this.bitArray = new Uint8Array(Math.ceil(this.size / 8));
   }
 

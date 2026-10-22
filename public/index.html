@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to experiment</a>
   <div class="app-layout">
     <!-- Top Navigation Bar -->
     <header class="topbar">
@@ -22,7 +23,7 @@
       <div class="system-status">
         <div class="status-pill healthy">
           <span class="dot"></span>
-          <span>Node.js v22 Runtime</span>
+          <span>Local learning lab</span>
         </div>
         <div class="metrics-quick-bar">
           <a href="/metrics" target="_blank" class="nav-btn">Prometheus /metrics</a>
@@ -34,7 +35,28 @@
 
     <div class="workspace">
       <!-- Sidebar Navigation -->
-      <aside class="sidebar">
+      <aside class="sidebar" aria-label="Learning modules">
+        <div class="sidebar-tools">
+          <div class="curriculum-heading"><h2>Explore the curriculum</h2><span id="topic-total">42 labs</span></div>
+          <label class="sr-only" for="topic-search">Search topics</label>
+          <input id="topic-search" type="search" placeholder="Search topics, e.g. consensus" autocomplete="off">
+          <label for="learning-path">Learning path</label>
+          <select id="learning-path">
+            <option value="all">All topics</option>
+            <option value="foundations">Backend foundations</option>
+            <option value="distributed">Distributed correctness</option>
+            <option value="reliability">Production reliability</option>
+          </select>
+          <div class="filter-row">
+            <div><label for="topic-level">Difficulty</label><select id="topic-level"><option value="all">All levels</option><option value="foundation">Foundation</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></div>
+            <div><label for="topic-status">Progress</label><select id="topic-status"><option value="all">All labs</option><option value="unfinished">To learn</option><option value="completed">Completed</option></select></div>
+          </div>
+          <div class="progress-heading"><span id="progress-label">0 of 42 completed</span><span class="local-note">Saved locally</span></div>
+          <progress id="learning-progress" value="0" max="42" aria-label="Learning path completion"></progress>
+          <p id="path-description" class="path-description">Explore freely or choose a guided sequence.</p>
+          <div class="browse-summary"><span id="filter-count" role="status" aria-live="polite">42 topics</span><button id="clear-filters" class="text-btn">Clear filters</button></div>
+        </div>
+        <nav class="topic-list" aria-label="Topics">
         <div class="nav-section">
           <div class="section-title">1. RUNTIME & SYSTEMS</div>
           <button class="nav-item active" data-exp="event-loop">
@@ -102,7 +124,7 @@
             <span class="icon">🎯</span> Indexes & Connection Pool
           </button>
           <button class="nav-item" data-exp="polyglot-persistence">
-            <span class="icon">💾</span> Polyglot, Redlock, BM25
+            <span class="icon">💾</span> Polyglot, Redis Locks, Search
           </button>
         </div>
 
@@ -158,16 +180,27 @@
             <span class="icon">☸️</span> Docker, K8s & Canary CI/CD
           </button>
         </div>
+        <div class="nav-section">
+          <div class="section-title">5. ADVANCED SYSTEMS</div>
+          <button class="nav-item" data-exp="consensus-quorum"><span class="icon">◈</span> Consensus & Quorum Loss</button>
+          <button class="nav-item" data-exp="fencing-tokens"><span class="icon">⊣</span> Leases & Fencing Tokens</button>
+          <button class="nav-item" data-exp="event-sourcing"><span class="icon">↻</span> Event Sourcing & CQRS</button>
+          <button class="nav-item" data-exp="snapshot-isolation"><span class="icon">◫</span> MVCC & Write Skew</button>
+          <button class="nav-item" data-exp="backpressure"><span class="icon">⇥</span> Backpressure & Load Shedding</button>
+          <button class="nav-item" data-exp="slo-burn-rate"><span class="icon">◴</span> SLO Budgets & Burn Rates</button>
+        </div>
+        <p id="no-topics" class="empty-topics" hidden>No topics match. Try a broader search or clear the filters.</p>
+        </nav>
       </aside>
 
       <!-- Main Stage -->
-      <main class="content-area">
+      <main class="content-area" id="main-content">
         <div class="experiment-header">
           <div class="title-cluster">
-            <span class="badge" id="exp-category">Pillar 1: Runtime</span>
+            <div class="topic-badges"><span class="badge" id="exp-category">Pillar 1: Runtime</span><span class="level-badge" id="exp-level">Foundation</span></div>
             <h2 id="exp-title">Event Loop Execution Order & Microtasks</h2>
             <p id="exp-desc">
-              Demonstrates the deterministic execution phases of Node.js: Synchronous Call Stack -> process.nextTick -> Promise Microtasks -> Macrotasks (Timers & Check).
+              Records the observed execution phases of Node.js: Synchronous Call Stack -> process.nextTick -> Promise Microtasks -> Macrotasks (Timers & Check).
             </p>
           </div>
           <div class="action-cluster">
@@ -176,6 +209,11 @@
             </button>
           </div>
         </div>
+
+        <section class="learning-card" aria-label="Learning goals">
+          <div><span class="eyebrow">Your objective</span><p id="learning-objective"></p><div id="prerequisites" class="prerequisites"></div></div>
+          <div class="learning-actions"><button id="mark-complete" class="secondary-btn" aria-pressed="false">Mark complete</button><button id="next-topic" class="text-btn">Next topic →</button><button id="copy-link" class="text-btn">Copy topic link</button><span id="link-feedback" role="status" aria-live="polite"></span></div>
+        </section>
 
         <!-- Custom Parameters Bar (dynamic) -->
         <div class="controls-card" id="controls-container">
@@ -190,11 +228,11 @@
         <!-- Interactive Canvas / Graphic Stage -->
         <div class="visualizer-card" id="visualizer-box">
           <div class="card-header">
-            <h3>Visual Execution Stage</h3>
-            <span class="status-tag" id="exec-status">Idle (Ready)</span>
+            <h3>Execution Trace & Results</h3>
+            <span class="status-tag" id="exec-status" role="status" aria-live="polite">Idle (Ready)</span>
           </div>
           <div class="stage-body" id="stage-viewport">
-            <div class="placeholder-graphic">Click "Run Live Experiment" to observe real-time execution.</div>
+            <div class="placeholder-graphic">Predict the outcome, then run the experiment to inspect its results.</div>
           </div>
         </div>
 
@@ -204,10 +242,11 @@
             <button class="tab-btn active" data-tab="json">JSON Result Payload</button>
             <button class="tab-btn" data-tab="architecture">Architectural Mechanics & Deep-Dive</button>
             <button class="tab-btn" data-tab="production">Production Code & Best Practices</button>
+            <button class="tab-btn" data-tab="challenge">Practice & References</button>
           </div>
 
           <div class="tab-content active" id="tab-json">
-            <pre><code id="json-output">// Experiment results will stream here...</code></pre>
+            <pre><code id="json-output">// Experiment results will appear here...</code></pre>
           </div>
 
           <div class="tab-content" id="tab-architecture">
@@ -221,11 +260,13 @@
               <!-- Production Code notes -->
             </div>
           </div>
+          <div class="tab-content" id="tab-challenge"><div class="doc-body" id="doc-challenge"></div></div>
         </div>
       </main>
     </div>
   </div>
 
+  <script src="curriculum.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -2,13 +2,16 @@
  * Modern Backend Engineering Mastery Lab - Master Server
  * Integrates:
  * - RESTful APIs & Idempotency
- * - Server-Sent Events (SSE) for Live Experiment Streaming
  * - WebSockets for real-time bi-directional protocols
  * - Prometheus Metrics (/metrics)
  * - Distributed Tracing & Structured Logging
  * - Interactive Experiment Orchestrator
  */
-import express from 'express';
+import express, { type ErrorRequestHandler } from 'express';
+import { experimentInput, InputError, queryInteger, stringInput } from './http-validation.js';
+import { LRUCache, RingBuffer, MinHeap, BloomFilter, TrieRouter } from './01-runtime-systems/data-structures/data-structures.js';
+import { OrderDatabase } from './02-api-security-db/rest-standards/rest-controller.js';
+import { AuthService } from './02-api-security-db/auth-security/auth-service.js';
 import { createServer } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'node:path';
@@ -39,10 +42,9 @@ import { parsePosixMode, calculateUmask } from './01-runtime-systems/os-fundamen
 import { globalOrderDb } from './02-api-security-db/rest-standards/rest-controller.js';
 import { runNPlusOneBenchmark } from './02-api-security-db/graphql-grpc/graphql-engine.js';
 import { compareProtobufVsJsonBenchmark } from './02-api-security-db/graphql-grpc/grpc-service.js';
-import { globalAuthService } from './02-api-security-db/auth-security/auth-service.js';
-import { RbacEvaluator, AbacPolicyEngine } from './02-api-security-db/auth-security/access-control.js';
+import { AbacPolicyEngine } from './02-api-security-db/auth-security/access-control.js';
 import { OwaspSecurityLab } from './02-api-security-db/owasp-security/owasp-lab.js';
-import { globalAcidSimulator } from './02-api-security-db/rdbms-acid/acid-transactions.js';
+import { AcidSimulator } from './02-api-security-db/rdbms-acid/acid-transactions.js';
 import { LockingBenchmark } from './02-api-security-db/rdbms-acid/locking-strategies.js';
 import { getIndexTypesComparison, analyzeExecutionPlan, calculateOptimalConnectionPool } from './02-api-security-db/db-tuning/index-tuning.js';
 import { getPolyglotPersistenceMatrix, globalRedisSimulator, InvertedIndexSearchEngine } from './02-api-security-db/polyglot-storage/polyglot-manager.js';
@@ -56,43 +58,63 @@ import { OrderSagaOrchestrator } from './03-architecture-distributed/distributed
 import { CachingEngineLab } from './03-architecture-distributed/caching-strategies/caching-engine.js';
 import { CapClusterSimulator } from './03-architecture-distributed/distributed-theory/cap-theorem.js';
 import { VectorClock, PNCounter } from './03-architecture-distributed/distributed-theory/eventual-consistency.js';
-import { compareModuloVsConsistentHashing, ConsistentHashRing } from './03-architecture-distributed/distributed-theory/consistent-hashing.js';
+import { compareModuloVsConsistentHashing } from './03-architecture-distributed/distributed-theory/consistent-hashing.js';
 
 import { TokenBucketRateLimiter, SlidingWindowRateLimiter } from './04-devops-reliability/resilience/rate-limiter.js';
 import { CircuitBreaker } from './04-devops-reliability/resilience/circuit-breaker.js';
 import { RetryStrategies } from './04-devops-reliability/resilience/retry-backoff.js';
 import { globalShutdownCoordinator } from './04-devops-reliability/resilience/graceful-shutdown.js';
 import { runInProcessStressBenchmark } from './04-devops-reliability/load-testing/runner.js';
+import { runConsensusLab } from './05-advanced-systems/consensus.js';
+import { runFencingLab } from './05-advanced-systems/fencing.js';
+import { runEventSourcingLab } from './05-advanced-systems/event-sourcing.js';
+import { runSnapshotLab } from './05-advanced-systems/snapshot-isolation.js';
+import { runBackpressureLab } from './05-advanced-systems/backpressure.js';
+import { runSloLab } from './05-advanced-systems/slo-burn.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 
+let activeExperiments = 0;
 const app = express();
 const server = createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
-
-app.use(express.json());
-app.use(express.static(path.join(projectRoot, 'public')));
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 });
+app.disable('x-powered-by');
 
 // Tracing and Metrics Middleware
 app.use((req, res, next) => {
-  const correlationId = (req.headers['x-correlation-id'] as string) || DistributedTracer.generateTraceId();
+  const incomingId = req.headers['x-correlation-id'];
+  const correlationId = typeof incomingId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(incomingId)
+    ? incomingId : DistributedTracer.generateTraceId();
   res.setHeader('X-Correlation-ID', correlationId);
 
   const start = performance.now();
+  if (globalShutdownCoordinator.isDraining()) {
+    res.setHeader('Connection', 'close');
+    res.status(503).json({ error: 'Server is shutting down' });
+    return;
+  }
   globalShutdownCoordinator.trackRequestStart();
 
-  res.on('finish', () => {
+  let completed = false;
+  const onComplete = () => {
+    if (completed) return;
+    completed = true;
     globalShutdownCoordinator.trackRequestEnd();
     const duration = (performance.now() - start) / 1000;
-    const route = req.route?.path || req.path;
-    httpRequestsTotal.inc({ method: req.method, route, status_code: res.statusCode });
+    const route = req.route?.path || (res.statusCode === 404 ? 'unmatched' : 'static');
+    httpRequestsTotal.inc({ method: req.method, route, status_code: res.writableFinished ? res.statusCode : 499 });
     httpRequestDurationSeconds.observe({ method: req.method, route }, duration);
-  });
+  };
+  res.once('finish', onComplete);
+  res.once('close', onComplete);
 
   traceStorage.run({ correlationId }, () => next());
 });
+
+app.use(express.json({ limit: '64kb' }));
+app.use(express.static(path.join(projectRoot, 'public')));
 
 // ========================================================
 // HEALTH & OBSERVABILITY ENDPOINTS
@@ -135,23 +157,27 @@ app.get('/api/telemetry/trace', (req, res) => {
 // REST API WITH PAGINATION & IDEMPOTENCY
 // ========================================================
 app.get('/api/v1/orders', (req, res) => {
-  const { cursor, offset, limit = '10', status } = req.query;
-  const parsedLimit = parseInt(limit as string, 10);
-
-  if (cursor !== undefined) {
-    const result = globalOrderDb.getWithCursorPagination((cursor as string) || null, parsedLimit, status as string);
-    return res.json(result);
+  const { cursor, status } = req.query;
+  const limit = queryInteger(req.query.limit, 'limit', 10, 1, 100);
+  const offset = queryInteger(req.query.offset, 'offset', 0, 0, Number.MAX_SAFE_INTEGER);
+  if (status !== undefined && (typeof status !== 'string' || !['PENDING', 'PROCESSING', 'COMPLETED', 'CANCELLED'].includes(status))) {
+    throw new InputError('status must be PENDING, PROCESSING, COMPLETED or CANCELLED');
   }
-
-  const parsedOffset = parseInt((offset as string) || '0', 10);
-  const result = globalOrderDb.getWithOffsetPagination(parsedOffset, parsedLimit, status as string);
-  res.json(result);
+  if (cursor !== undefined) {
+    if (typeof cursor !== 'string') throw new InputError('cursor must be a string');
+    if (cursor && (!/^[A-Za-z0-9+/]+={0,2}$/.test(cursor) || !/^ord_\d+$/.test(Buffer.from(cursor, 'base64').toString('utf8')))) {
+      throw new InputError('cursor must encode an order ID in base64');
+    }
+    return res.json(globalOrderDb.getWithCursorPagination(cursor || null, limit, status as string));
+  }
+  res.json(globalOrderDb.getWithOffsetPagination(offset, limit, status as string));
 });
 
 app.post('/api/v1/orders', (req, res) => {
-  const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
+  const idempotencyKey = req.headers['idempotency-key'];
+  if (idempotencyKey !== undefined) stringInput(idempotencyKey, 'Idempotency-Key', 200);
   try {
-    const result = globalOrderDb.createOrder(req.body, idempotencyKey);
+    const result = globalOrderDb.createOrder(req.body, idempotencyKey as string | undefined);
     if (result.idempotentReplay) {
       res.setHeader('X-Cache', 'IDEMPOTENT-HIT');
     }
@@ -168,13 +194,37 @@ app.post('/api/v1/orders', (req, res) => {
 // MASTER EXPERIMENTS EXECUTION DISPATCHER
 // ========================================================
 app.post('/api/experiments/run', async (req, res) => {
-  const { experimentId, params = {} } = req.body;
+  const { experimentId, params } = experimentInput(req.body);
+  if (activeExperiments >= 2) {
+    res.setHeader('Retry-After', '1');
+    return res.status(429).json({ error: 'Two experiments are already running. Try again shortly.' });
+  }
+  activeExperiments++;
   const start = performance.now();
 
   try {
     let result: any;
 
     switch (experimentId) {
+      // Track 5: deterministic advanced systems models
+      case 'consensus-quorum':
+        result = runConsensusLab(params.clusterSize, params.availableNodes);
+        break;
+      case 'fencing-tokens':
+        result = runFencingLab(params.pauseMs);
+        break;
+      case 'event-sourcing':
+        result = runEventSourcingLab(params.projectionBatch);
+        break;
+      case 'snapshot-isolation':
+        result = runSnapshotLab(params.onCallDoctors);
+        break;
+      case 'backpressure':
+        result = runBackpressureLab(params.producerRate, params.consumerRate, params.queueCapacity);
+        break;
+      case 'slo-burn-rate':
+        result = runSloLab(params.sloBasisPoints, params.longErrorBasisPoints, params.shortErrorBasisPoints);
+        break;
       // Track 1: Runtime & Systems
       case 'event-loop':
         result = await runEventLoopExperiment();
@@ -219,12 +269,42 @@ app.post('/api/experiments/run', async (req, res) => {
           hostReport: getHostOsSystemReport(),
           concurrencyModels: getConcurrencyModelMatrix(),
           ioEvolution: getIoMultiplexingEvolution(),
-          posixPermissions: parsePosixMode(params.mode || 0o755),
-          umaskCalculation: calculateUmask(params.createdMode || 0o666, params.umask || 0o022),
+          posixPermissions: parsePosixMode(params.mode ?? 0o755),
+          umaskCalculation: calculateUmask(params.createdMode ?? 0o666, params.umask ?? 0o022),
         };
         break;
 
+      case 'data-structures': {
+        const cache = new LRUCache<string, number>(2);
+        cache.put('a', 1); cache.put('b', 2); cache.get('a'); cache.put('c', 3);
+        const ring = new RingBuffer<number>(2);
+        [1, 2, 3].forEach(value => ring.enqueue(value));
+        const heap = new MinHeap<number>((a, b) => a - b);
+        [3, 1, 2].forEach(value => heap.push(value));
+        const bloom = new BloomFilter(); bloom.add('known');
+        const trie = new TrieRouter(); trie.insert('/orders', 'orders-handler');
+        result = { lru: { evictedB: cache.get('b') === undefined, retainedA: cache.get('a') },
+          ringBuffer: [ring.dequeue(), ring.dequeue()], minHeap: [heap.pop(), heap.pop(), heap.pop()],
+          bloom: { known: bloom.test('known'), missing: bloom.test('missing') }, trie: trie.search('/orders') };
+        break;
+      }
+
       // Track 2: API, Security & Databases
+      case 'rest-pagination': {
+        const db = new OrderDatabase();
+        const first = db.getWithCursorPagination(null, 5);
+        result = { offset: db.getWithOffsetPagination(5, 5), firstCursorPage: first,
+          nextCursorPage: db.getWithCursorPagination(first.pagination.nextCursor, 5) };
+        break;
+      }
+      case 'idempotency': {
+        const db = new OrderDatabase();
+        const key = DistributedTracer.generateTraceId();
+        const payload = { customerName: 'Lab customer', amount: 99 };
+        result = { initial: db.createOrder(payload, key), replay: db.createOrder(payload, key),
+          explanation: 'Both requests return the same order. A changed payload with the same key is rejected.' };
+        break;
+      }
       case 'graphql-dataloader':
         result = await runNPlusOneBenchmark();
         break;
@@ -232,7 +312,7 @@ app.post('/api/experiments/run', async (req, res) => {
         result = compareProtobufVsJsonBenchmark(params.iterations || 20000);
         break;
       case 'auth-jwt-rotation': {
-        const auth = globalAuthService;
+        const auth = new AuthService();
         const initial = auth.issueTokenPair('usr_test', 'user@example.com');
         const rotated = auth.rotateRefreshToken(initial.refreshToken, 'user@example.com');
         const replayAttack = auth.rotateRefreshToken(initial.refreshToken, 'user@example.com');
@@ -262,14 +342,17 @@ app.post('/api/experiments/run', async (req, res) => {
         };
         break;
       case 'acid-transactions': {
-        const dualModeTransfer = await globalPostgresAdapter.executeAtomicTransfer('acc_alice', 'acc_bob', 100);
+        const simulation = new AcidSimulator();
+        const dualModeTransfer = globalPostgresAdapter.getMode() === 'IN_MEMORY_FALLBACK'
+          ? { ...await new AcidSimulator().executeAtomicTransfer('acc_alice', 'acc_bob', 100), mode: 'IN_MEMORY_FALLBACK' }
+          : await globalPostgresAdapter.executeAtomicTransfer('acc_alice', 'acc_bob', 100);
         result = {
           dualModeTransfer,
-          normalTransfer: await globalAcidSimulator.executeAtomicTransfer('acc_alice', 'acc_bob', 100),
-          crashRollback: await globalAcidSimulator.executeAtomicTransfer('acc_alice', 'acc_bob', 100, 1),
-          dirtyRead: globalAcidSimulator.simulateDirtyReadAnomaly(),
-          nonRepeatableRead: globalAcidSimulator.simulateNonRepeatableReadAnomaly(),
-          phantomRead: globalAcidSimulator.simulatePhantomReadAnomaly(),
+          normalTransfer: await simulation.executeAtomicTransfer('acc_alice', 'acc_bob', 100),
+          crashRollback: await simulation.executeAtomicTransfer('acc_alice', 'acc_bob', 100, 1),
+          dirtyRead: simulation.simulateDirtyReadAnomaly(),
+          nonRepeatableRead: simulation.simulateNonRepeatableReadAnomaly(),
+          phantomRead: simulation.simulatePhantomReadAnomaly(),
         };
         break;
       }
@@ -303,6 +386,8 @@ app.post('/api/experiments/run', async (req, res) => {
         search.indexDocument(2, 'PostgreSQL query optimization with B-Tree indexes');
         search.indexDocument(3, 'Cache stampede and thundering herd mitigation with Redis');
 
+        if (lock.lockToken) redis.releaseDistributedLock('order_checkout_lock', lock.lockToken);
+        if (dualModeLock.lockToken) await globalRedisAdapter.releaseDistributedLock('dual_order_lock', dualModeLock.lockToken);
         result = {
           storageMatrix: getPolyglotPersistenceMatrix(),
           redisRedlock: lock,
@@ -420,6 +505,17 @@ app.post('/api/experiments/run', async (req, res) => {
         break;
 
       // Track 4: DevOps, Reliability & Observability
+      case 'observability':
+        result = { trace: DistributedTracer.simulateDistributedOrderTrace(), metricsEndpoint: '/metrics',
+          correlationId: res.getHeader('X-Correlation-ID'), logging: 'Structured Pino logs use the request correlation ID.' };
+        break;
+      case 'devops-k8s':
+        result = { container: { runtime: 'Node.js 22', user: 'node', entrypoint: 'node dist/server.js' },
+          probes: { liveness: '/api/v1/health', readiness: '/api/v1/ready' },
+          scaling: { replicas: 3, maxReplicas: 10 },
+          deployment: 'Example manifests require real credentials and cluster setup. The CI canary stage is a simulation.',
+          tracing: 'Trace spans are simulated locally; this lab does not export OTLP to Jaeger.' };
+        break;
       case 'rate-limiting': {
         const tb = new TokenBucketRateLimiter(5, 1);
         const sw = new SlidingWindowRateLimiter(60000, 5);
@@ -468,13 +564,21 @@ app.post('/api/experiments/run', async (req, res) => {
       executionDurationMs: durationMs,
       data: result,
     });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message, stack: err.stack });
+  } catch (err) {
+    ContextLogger.error('Experiment failed', err, { experimentId });
+    res.status(500).json({ error: 'Experiment failed', correlationId: res.getHeader('X-Correlation-ID') });
+  } finally {
+    activeExperiments--;
   }
 });
 
 // WebSocket Echo & Real-Time Stream
 wss.on('connection', (ws: WebSocket) => {
+  ws.on('error', err => ContextLogger.warn('WebSocket connection error', { message: err.message }));
+  if (globalShutdownCoordinator.isDraining()) {
+    ws.close(1012, 'Server is shutting down');
+    return;
+  }
   ws.send(JSON.stringify({ type: 'WELCOME', message: 'Connected to Modern Backend Lab WebSocket' }));
 
   ws.on('message', (message: string) => {
@@ -487,31 +591,51 @@ wss.on('connection', (ws: WebSocket) => {
   });
 });
 
-const PORT = parseInt(process.env.PORT || '4000', 10);
+app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
+const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  const status = err instanceof InputError ? 400 : [400, 413, 415].includes(err.status) ? err.status : 500;
+  if (status === 500) ContextLogger.error('HTTP request failed', err);
+  res.status(status).json({ error: status === 500 ? 'Internal server error' : status === 413 ? 'Request body too large' : err.message });
+};
+app.use(errorHandler);
 
-// Setup Graceful Shutdown hooks
-globalShutdownCoordinator.registerHook('HTTP Server Teardown', async () => {
-  await new Promise<void>((resolve) => server.close(() => resolve()));
+globalShutdownCoordinator.registerHook('HTTP and WebSocket teardown', async () => {
+  for (const ws of wss.clients) ws.terminate();
+  await new Promise<void>((resolve, reject) => wss.close(err => err ? reject(err) : resolve()));
+  await new Promise<void>((resolve, reject) => {
+    server.close(err => err ? reject(err) : resolve());
+    server.closeAllConnections();
+  });
 });
-globalShutdownCoordinator.registerHook('PostgreSQL Pool Teardown', async () => {
-  await globalPostgresAdapter.close();
-});
-globalShutdownCoordinator.registerHook('Redis Client Teardown', async () => {
-  await globalRedisAdapter.close();
-});
+globalShutdownCoordinator.registerHook('PostgreSQL pool teardown', () => globalPostgresAdapter.close());
+globalShutdownCoordinator.registerHook('Redis client teardown', () => globalRedisAdapter.close());
 
-// Auto-initialize PostgreSQL schema if live database is reachable
-globalPostgresAdapter.initSchema().catch(() => {});
+export async function startServer(port = Number(process.env.PORT ?? 4000), host = process.env.HOST ?? '127.0.0.1'): Promise<void> {
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('PORT must be an integer between 0 and 65535');
+  await Promise.all([globalPostgresAdapter.initSchema(), globalRedisAdapter.connect()]);
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, host, () => { server.off('error', reject); resolve(); });
+  });
+  const address = server.address();
+  const actualPort = typeof address === 'object' && address ? address.port : port;
+  ContextLogger.info(`Backend Lab listening at http://${host}:${actualPort}`);
+}
 
-server.listen(PORT, '0.0.0.0', () => {
-  ContextLogger.info(`🚀 Modern Backend Engineering Lab server listening on port ${PORT}`);
-  console.log(`\n================================================================`);
-  console.log(`🚀 Modern Backend Engineering Mastery Lab`);
-  console.log(`🌐 Web Dashboard: http://localhost:${PORT}`);
-  console.log(`📊 Prometheus Metrics: http://localhost:${PORT}/metrics`);
-  console.log(`⚡ WebSocket Stream: ws://localhost:${PORT}/ws`);
-  console.log(`🩺 Healthcheck: http://localhost:${PORT}/api/v1/health`);
-  console.log(`================================================================\n`);
-});
+async function shutdown(signal: 'SIGTERM' | 'SIGINT'): Promise<void> {
+  const result = await globalShutdownCoordinator.triggerShutdown(signal);
+  ContextLogger.info('Shutdown finished', { ...result });
+  process.exit(result.success ? 0 : 1);
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  process.once('SIGTERM', () => { void shutdown('SIGTERM'); });
+  process.once('SIGINT', () => { void shutdown('SIGINT'); });
+  startServer().catch(async err => {
+    ContextLogger.error('Server startup failed', err);
+    await Promise.allSettled([globalPostgresAdapter.close(), globalRedisAdapter.close()]);
+    process.exitCode = 1;
+  });
+}
 
 export { app, server };

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 // Heavy CPU computation: calculates primes up to N
 export function computePrimesSync(limit: number): number[] {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 80000) throw new RangeError('Prime count must be between 1 and 80000');
   const primes: number[] = [];
   for (let i = 2; primes.length < limit; i++) {
     let isPrime = true;
@@ -92,14 +93,21 @@ export async function compareSyncVsWorkerConcurrency(limit: number = 25000): Pro
 
   // Scenario B: Worker Thread
   let heartbeatsDuringWorker = 0;
+  let previousTick = performance.now();
+  let workerLag = 0;
   const workerTimer = setInterval(() => {
+    const now = performance.now();
+    workerLag = Math.max(workerLag, now - previousTick - heartbeatLag);
+    previousTick = now;
     heartbeatsDuringWorker++;
   }, heartbeatLag);
 
   const workerStart = performance.now();
-  await runInWorkerThread(limit);
-  const workerDuration = performance.now() - workerStart;
-  clearInterval(workerTimer);
+  let workerDuration: number;
+  try {
+    await runInWorkerThread(limit);
+    workerDuration = performance.now() - workerStart;
+  } finally { clearInterval(workerTimer); }
 
   return {
     syncRun: {
@@ -109,9 +117,9 @@ export async function compareSyncVsWorkerConcurrency(limit: number = 25000): Pro
     },
     workerRun: {
       durationMs: Math.round(workerDuration),
-      eventLoopLagMs: 0.5, // Remained responsive
+      eventLoopLagMs: Math.round(workerLag * 100) / 100,
       blockedHeartbeats: heartbeatsDuringWorker,
     },
-    verdict: `Sync execution stalled the Event Loop for ${Math.round(syncDuration)}ms (0 heartbeats fired!). Worker Thread ran parallel with 0ms event loop lag (${heartbeatsDuringWorker} responsive ticks).`,
+    verdict: `Sync execution stalled the Event Loop for ${Math.round(syncDuration)}ms (0 heartbeats fired!). Worker Thread ran parallel with ${Math.round(workerLag * 100) / 100}ms measured maximum timer lag (${heartbeatsDuringWorker} responsive ticks).`,
   };
 }

@@ -12,6 +12,17 @@
  */
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
+import { BlockList, isIP } from 'node:net';
+
+const privateAddresses = new BlockList();
+for (const [address, prefix] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16], ['224.0.0.0', 4], ['240.0.0.0', 4]] as const) {
+  privateAddresses.addSubnet(address, prefix, 'ipv4');
+}
+privateAddresses.addAddress('::', 'ipv6');
+privateAddresses.addAddress('::1', 'ipv6');
+privateAddresses.addSubnet('fc00::', 7, 'ipv6');
+privateAddresses.addSubnet('fe80::', 10, 'ipv6');
+privateAddresses.addSubnet('ff00::', 8, 'ipv6');
 
 export class OwaspSecurityLab {
   // ==========================================
@@ -82,23 +93,19 @@ export class OwaspSecurityLab {
         return { allowed: false, reason: 'Protocol must be HTTP or HTTPS only (blocked file://, gopher://)' };
       }
 
-      const host = parsed.hostname.toLowerCase();
-
-      // Block Cloud Metadata endpoints and localhost
-      if (host === '169.254.169.254' || host === 'metadata.google.internal' || host === 'localhost' || host === '127.0.0.1') {
-        return { allowed: false, reason: 'BLOCKED: Attempt to access link-local cloud metadata (AWS/GCP) or loopback!' };
+      const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+      if (parsed.username || parsed.password) return { allowed: false, reason: 'Embedded URL credentials are blocked' };
+      if (host === 'localhost' || host.endsWith('.localhost') || host === 'metadata.google.internal') {
+        return { allowed: false, reason: 'BLOCKED: Localhost or cloud metadata hostname' };
       }
-
-      // Block RFC 1918 Private Subnets (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
-      if (
-        host.startsWith('10.') ||
-        host.startsWith('192.168.') ||
-        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)
-      ) {
-        return { allowed: false, reason: 'BLOCKED: Target IP belongs to internal private RFC1918 network!' };
+      const family = isIP(host);
+      if (family && privateAddresses.check(host, family === 6 ? 'ipv6' : 'ipv4')) {
+        return { allowed: false, reason: 'BLOCKED: Target is a private, loopback, link-local or reserved address' };
       }
+      return { allowed: true, reason: family
+        ? 'Public IP passed static validation. Revalidate every redirect before connecting.'
+        : 'Hostname passed static validation only. Resolve and check every address and redirect before connecting (DNS rebinding risk).', targetHostname: host };
 
-      return { allowed: true, reason: 'Target URL is safe public Internet destination', targetHostname: host };
     } catch (err: any) {
       return { allowed: false, reason: `Malformed URL: ${err.message}` };
     }

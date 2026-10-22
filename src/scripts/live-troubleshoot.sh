@@ -39,7 +39,7 @@ fi
 echo -e "\n${COLOR_YELLOW}[3] File Descriptors & Limits (Detecting FD Exhaustion / EMFILE):${COLOR_RESET}"
 CURRENT_ULIMIT=$(ulimit -n)
 echo "Current Shell FD Limit (ulimit -n): ${CURRENT_ULIMIT}"
-if [ -d /proc/sys/fs/file-nr ]; then
+if [ -r /proc/sys/fs/file-nr ]; then
   cat /proc/sys/fs/file-nr | awk '{printf "Allocated FDs: %s / Max FDs: %s\n", $1, $3}'
 else
   SYS_MAX_FDS=$(sysctl -n kern.maxfiles 2>/dev/null || echo "N/A")
@@ -61,7 +61,7 @@ echo -e "\n${COLOR_YELLOW}[5] Top CPU Consuming Processes:${COLOR_RESET}"
 ps -A -o pid,ppid,state,%cpu,%mem,comm | sort -k4 -rn | head -n 6
 
 echo -e "\n${COLOR_YELLOW}[6] Checking for Zombie (Z) or Uninterruptible Disk Sleep (D) processes:${COLOR_RESET}"
-ZOMBIES=$(ps -A -o state,pid,comm | grep -E '^[Z|D]' || true)
+ZOMBIES=$(ps -A -o state,pid,comm | grep -E '^[ZD]' || true)
 if [ -z "$ZOMBIES" ]; then
   echo -e "${COLOR_GREEN}✓ No zombie or D-state processes detected.${COLOR_RESET}"
 else

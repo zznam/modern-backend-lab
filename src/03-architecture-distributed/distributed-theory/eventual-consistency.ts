@@ -61,10 +61,12 @@ export class PNCounter {
   constructor(private nodeId: string) {}
 
   public increment(value = 1): void {
+    if (!Number.isSafeInteger(value) || value < 0) throw new Error('Counter change must be a nonnegative integer');
     this.p[this.nodeId] = (this.p[this.nodeId] || 0) + value;
   }
 
   public decrement(value = 1): void {
+    if (!Number.isSafeInteger(value) || value < 0) throw new Error('Counter change must be a nonnegative integer');
     this.n[this.nodeId] = (this.n[this.nodeId] || 0) + value;
   }
 

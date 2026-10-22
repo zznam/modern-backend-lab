@@ -16,11 +16,20 @@ import { OrderSagaOrchestrator } from './03-architecture-distributed/distributed
 import { compareModuloVsConsistentHashing } from './03-architecture-distributed/distributed-theory/consistent-hashing.js';
 import { runInProcessStressBenchmark } from './04-devops-reliability/load-testing/runner.js';
 import { DistributedTracer } from './04-devops-reliability/observability/tracer.js';
+import { runConsensusLab } from './05-advanced-systems/consensus.js';
+import { runFencingLab } from './05-advanced-systems/fencing.js';
+import { runEventSourcingLab } from './05-advanced-systems/event-sourcing.js';
+import { runSnapshotLab } from './05-advanced-systems/snapshot-isolation.js';
+import { runBackpressureLab } from './05-advanced-systems/backpressure.js';
+import { runSloLab } from './05-advanced-systems/slo-burn.js';
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
+
+let cliClosed = false;
+rl.on('close', () => { cliClosed = true; });
 
 const menu = `
 ================================================================
@@ -41,16 +50,28 @@ Choose an experiment to run:
 11. [Distributed] Consistent Hashing Ring vs Modulo Reshuffle
 12. [DevOps] In-Process Stress Test (RPS & p95/p99 Latency)
 13. [Observability] OpenTelemetry Distributed Trace Generation
+14. [Advanced] Consensus, Quorum Loss & Log Repair
+15. [Advanced] Lease Expiry & Fencing Tokens
+16. [Advanced] Event Sourcing, CQRS & Projection Replay
+17. [Advanced] Snapshot Isolation & Write Skew
+18. [Advanced] Backpressure & Load Shedding
+19. [Advanced] SLO Error Budgets & Multiwindow Burn Rates
 
 q. Quit
 ----------------------------------------------------------------
-Enter selection (1-13 or q): `;
+Enter selection (1-19 or q): `;
 
 async function handleSelection(choice: string): Promise<void> {
   console.log('\n⏳ Running experiment...\n');
   const start = performance.now();
 
   switch (choice.trim()) {
+    case '14': console.log(JSON.stringify(runConsensusLab(), null, 2)); break;
+    case '15': console.log(JSON.stringify(runFencingLab(), null, 2)); break;
+    case '16': console.log(JSON.stringify(runEventSourcingLab(), null, 2)); break;
+    case '17': console.log(JSON.stringify(runSnapshotLab(), null, 2)); break;
+    case '18': console.log(JSON.stringify(runBackpressureLab(), null, 2)); break;
+    case '19': console.log(JSON.stringify(runSloLab(), null, 2)); break;
     case '1': {
       const res = await runEventLoopExperiment();
       console.log('📊 Event Loop Execution Trace:');
@@ -152,31 +173,31 @@ async function handleSelection(choice: string): Promise<void> {
     case 'q':
     case 'exit':
       rl.close();
-      process.exit(0);
+      return;
     default:
-      console.log('Invalid option. Please select 1-13 or q.');
+      throw new Error('Invalid option. Please select 1-19 or q.');
   }
 
   const duration = Math.round((performance.now() - start) * 10) / 10;
   console.log(`\n✓ Experiment finished in ${duration}ms\n`);
-  if (!process.argv[2]) {
-    promptUser();
-  }
+
 }
 
 function promptUser(): void {
   rl.question(menu, (ans) => {
-    handleSelection(ans);
+    handleSelection(ans).catch(err => console.error(`Experiment failed: ${err.message}`)).finally(() => {
+      if (!cliClosed) promptUser();
+    });
   });
 }
 
 // Check if run directly
 const directArg = process.argv[2];
 if (directArg) {
-  handleSelection(directArg).then(() => {
-    rl.close();
-    process.exit(0);
-  });
+  handleSelection(directArg).catch(err => {
+    console.error(`Experiment failed: ${err.message}`);
+    process.exitCode = 1;
+  }).finally(() => rl.close());
 } else {
   promptUser();
 }

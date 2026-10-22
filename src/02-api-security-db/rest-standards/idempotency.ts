@@ -25,7 +25,8 @@ export class IdempotencyStore {
   private defaultTtlMs = 60 * 1000; // 60 seconds TTL
 
   public hashPayload(payload: any): string {
-    return createHash('sha256').update(JSON.stringify(payload || {})).digest('hex');
+    return createHash('sha256').update(JSON.stringify(payload, (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value)).digest('hex');
   }
 
   public acquireOrCheck(
@@ -47,14 +48,12 @@ export class IdempotencyStore {
       return { action: 'PROCEED' };
     }
 
-    if (existing.status === 'PROCESSING') {
-      return { action: 'CONFLICT_IN_FLIGHT' };
+    if (existing.requestHash !== this.hashPayload(payload)) {
+      throw new Error('422 Unprocessable: Idempotency key reused with different request payload!');
     }
 
-    // Status is COMPLETED: Verify payload hash matches
-    const currentHash = this.hashPayload(payload);
-    if (existing.requestHash !== currentHash) {
-      throw new Error('422 Unprocessable: Idempotency key reused with different request payload!');
+    if (existing.status === 'PROCESSING') {
+      return { action: 'CONFLICT_IN_FLIGHT' };
     }
 
     return { action: 'RETURN_CACHED', record: existing };
