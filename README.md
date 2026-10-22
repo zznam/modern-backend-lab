@@ -57,6 +57,12 @@ A hands-on learning platform for exploring modern backend engineering, high-avai
 | | Contract Testing & Load Stressing | Consumer-driven verification & Autocannon load | [`contract-testing.ts`](src/04-devops-reliability/testing/contract-testing.ts) |
 | | Containerization & K8s | Multi-stage Dockerfile, Compose & K8s HPA | [`Dockerfile`](Dockerfile), [`k8s/`](k8s/) |
 | | CI/CD Progressive Delivery | GitHub Actions with simulated Canary rollout | [`ci-cd.yml`](.github/workflows/ci-cd.yml) |
+| **5. Advanced Systems** | Consensus, Quorum Loss & Log Repair | Partition an old leader, elect a majority, repair the log | [`consensus.ts`](src/05-advanced-systems/consensus.ts) |
+| | Lease Expiry & Fencing Tokens | Reject a paused stale owner at the protected resource | [`fencing.ts`](src/05-advanced-systems/fencing.ts) |
+| | Event Sourcing & CQRS | Version conflicts, projection lag, replay & deduplication | [`event-sourcing.ts`](src/05-advanced-systems/event-sourcing.ts) |
+| | MVCC & Snapshot Write Skew | Cross-row invariant violation vs read-set validation | [`snapshot-isolation.ts`](src/05-advanced-systems/snapshot-isolation.ts) |
+| | Backpressure & Load Shedding | Compare unbounded, cooperative, and rejecting queues | [`backpressure.ts`](src/05-advanced-systems/backpressure.ts) |
+| | SLO Error Budgets & Burn Rates | Evaluate both 1-hour and 5-minute fast-burn windows | [`slo-burn.ts`](src/05-advanced-systems/slo-burn.ts) |
 
 ---
 
@@ -69,6 +75,10 @@ npm ci
 npm start
 ```
 Then visit: **`http://localhost:4000`**. No external services are required: the lab uses in-memory adapters when database URLs are absent.
+
+The dashboard includes **42 runnable topics**. Search by concept (for example, `raft` or `write skew`), filter by difficulty or completion, or choose one of three guided paths: **Backend foundations**, **Distributed correctness**, and **Production reliability**. Every topic includes a learning objective, prerequisites, mechanics, production considerations, and a practice prompt. The advanced topics also include adjustable parameters, summary metrics, execution traces, and primary references.
+
+Use **Mark complete** to track learning explicitly, **Next topic** to follow the chosen path, and **Copy topic link** to share a URL such as `http://localhost:4000/#consensus-quorum`. Completion, the selected path, and the last viewed topic are saved in browser local storage; a valid URL fragment takes precedence on load. Storage failures fall back to session-only progress. No learning history is sent to the server.
 
 The server binds to `127.0.0.1` by default. Set `HOST=0.0.0.0` explicitly for containers or access from another device. `PORT` defaults to `4000`. The Docker image sets `HOST` automatically.
 
@@ -94,6 +104,12 @@ npm run lab 10   # Saga Distributed Transaction Rollback Simulation
 npm run lab 11   # Consistent Hashing vs Modulo Reshuffle
 npm run lab 12   # In-Process Stress Test (RPS & p95/p99 Latency)
 npm run lab 13   # OpenTelemetry Distributed Trace Generation
+npm run lab 14   # Consensus, Quorum Loss & Log Repair
+npm run lab 15   # Lease Expiry & Fencing Tokens
+npm run lab 16   # Event Sourcing, CQRS & Projection Replay
+npm run lab 17   # Snapshot Isolation & Write Skew
+npm run lab 18   # Backpressure & Load Shedding
+npm run lab 19   # SLO Error Budgets & Multiwindow Burn Rates
 ```
 
 ### 3. Run the Automated Test Suite
@@ -101,7 +117,7 @@ Run the complete local validation gate (typecheck, unit/integration tests, and b
 ```bash
 npm run check
 ```
-The HTTP integration suite starts an ephemeral local server and runs every dashboard module, order creation/replay, input rejection, metrics, readiness, and WebSocket echo. The memory-leak module intentionally emits a `MaxListenersExceededWarning` before cleaning up its listeners.
+The HTTP integration suite starts an ephemeral local server and runs every dashboard module, custom advanced scenarios, order creation/replay, input rejection, metrics, readiness, and WebSocket echo. The local DOM suite tests search, combined filters, paths, completion persistence, deep links, prerequisite navigation, keyboard tabs, result rendering, stale responses, and storage failure using Happy DOM with external resources and network requests disabled/mocked. These DOM tests do not replace visual checks in a real browser. The memory-leak module intentionally emits a `MaxListenersExceededWarning` before cleaning up its listeners.
 
 To include real PostgreSQL rollback, missing-account, and concurrent-transfer tests, provide a **disposable** test database (the tests reset the two seeded lab accounts):
 ```bash
@@ -191,7 +207,7 @@ In [`caching-engine.ts`](src/03-architecture-distributed/caching-strategies/cach
 
 ## API behavior and teaching boundaries
 
-- All 36 dashboard navigation items have runnable handlers. Results return after the experiment completes; there is no SSE stream. `/ws` is a separate echo demonstration.
+- All 42 dashboard navigation items have runnable handlers. Results return after the experiment completes; there is no SSE stream. `/ws` is a separate echo demonstration.
 - `POST /api/experiments/run` requires an `experimentId` string and optional object `params`. Numeric controls are checked on the server (up to 80,000 primes, 100 concurrent tasks, 5,000 requests/keys, or 100,000 serialization iterations). At most two experiments run concurrently; additional runs receive 429 and `Retry-After`.
 - `GET /api/v1/orders` accepts `limit` 1–100, a nonnegative `offset`, a valid `status`, or a base64 order-ID `cursor`. Cursor pages seek the first greater key even when filtering excludes the cursor row. The array simulation still pays for filtering; a real database needs an appropriate index.
 - `POST /api/v1/orders` requires a nonempty `customerName` (maximum 200 characters) and finite positive `amount`. An optional `Idempotency-Key` replays the original response for the same payload; changed payloads receive 422. The in-memory key cache expires after 60 seconds and does not coordinate replicas.
@@ -200,6 +216,19 @@ In [`caching-engine.ts`](src/03-architecture-distributed/caching-strategies/cach
 - The SSRF lab performs static URL/IP checks only. A real HTTP client must validate DNS results, redirects, and the destination at connection time. The token lab revokes refresh-token families on replay; already-issued access JWTs retain their signed lifetime.
 - The broker, outbox, CAP, GraphQL batching, and tracing examples are teaching simulations. The broker requeues retries immediately; the retry-backoff module demonstrates delay calculations separately. Redis locking uses one Redis instance with ownership tokens, not the multi-node Redlock algorithm.
 - Serialization compares JSON-to-UTF-8 encoding with a minimal protobuf wire encoder; it does not run a gRPC server. Worker lag is measured from timer delays and varies by hardware and scheduler.
+
+### Advanced model boundaries and suggested experiments
+
+The advanced labs are deterministic in-memory models with logical schedules; they do not start a consensus cluster, persist an event store, run PostgreSQL SSI, execute real streams, or install live alert rules. Each result includes its model boundary next to the trace.
+
+- **Consensus:** With 5 members, change reachable voters from 2 to 3. A majority is based on fixed membership even when nodes are unavailable. This scripted Raft-inspired scenario begins with equal committed logs; it does not implement arbitrary leader elections, durable votes, or membership changes. See the [Raft paper](https://raft.github.io/raft.pdf).
+- **Fencing:** Compare worker pauses of 999 and 1000 ms against a 1000 ms lease. A newer accepted token fences the stale owner; checking the token must be atomic with the resource write. See [Martin Kleppmann on distributed locking](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html).
+- **Event sourcing:** Query after 0–3 projected events, then inspect catch-up and duplicate replay. Checkpoints assume one ordered aggregate stream. Projection writes and checkpoints require atomic persistence in production. See [Microsoft's Event Sourcing pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing).
+- **Snapshot isolation:** Compare 2 and 3 on-call doctors. Stable snapshots can still permit write skew across different rows. The comparison validates the complete read set conservatively and retries with fresh state; it is not PostgreSQL's SSI algorithm. See [PostgreSQL transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html).
+- **Backpressure:** Change offered jobs, service capacity, and queue size. Admission precedes service on each of 12 ticks. Deferred demand stays upstream rather than entering a second local queue. See [Node.js stream backpressure](https://nodejs.org/en/learn/modules/backpressuring-in-streams).
+- **SLOs:** With a 99.9% SLO, 2% errors produce 20× burn. Set the short-window errors to zero to suppress the fast-burn page while the long window stays elevated. The 14.4× threshold applies to a 1-hour/5-minute pair and a 30-day request-based SLO; the budget-spend estimate assumes constant request volume. Slower-burn policies remain necessary. See the [Google SRE Workbook](https://sre.google/workbook/alerting-on-slos/).
+
+Advanced HTTP controls are bounded integers: odd `clusterSize` 3–9, `availableNodes` 1–8 and smaller than the cluster, `pauseMs` 0–20,000, `projectionBatch` 0–3, `onCallDoctors` 2–10, queue rates/capacity 1–100, `sloBasisPoints` 9,000–9,999, and error ratios 0–10,000 basis points (100 bp = 1%). API defaults match the dashboard defaults. Each run constructs fresh state.
 
 
 Event-loop ordering notes follow the [Node.js process documentation](https://nodejs.org/api/process.html#when-to-use-queuemicrotask-vs-processnexttick) and [event-loop guide](https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick). The I/O comparison describes ready-event delivery, as documented by [epoll(7)](https://man7.org/linux/man-pages/man7/epoll.7.html) and [epoll_wait(2)](https://man7.org/linux/man-pages/man2/epoll_wait.2.html), without claiming that event copies use mmap or shared memory.

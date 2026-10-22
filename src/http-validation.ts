@@ -38,9 +38,20 @@ export function experimentInput(body: unknown): { experimentId: string; params: 
     limit: [1, 80000], iterations: [1, 100000], concurrency: [1, 100],
     cpuCores: [1, 256], keyCount: [1, 5000], totalRequests: [1, 5000],
     mode: [0, 0o7777], createdMode: [0, 0o7777], umask: [0, 0o777],
+    clusterSize: [3, 9], availableNodes: [1, 8], pauseMs: [0, 20000],
+    projectionBatch: [0, 3], onCallDoctors: [2, 10],
+    producerRate: [1, 100], consumerRate: [1, 100], queueCapacity: [1, 100],
+    sloBasisPoints: [9000, 9999], longErrorBasisPoints: [0, 10000], shortErrorBasisPoints: [0, 10000],
   };
   for (const [key, range] of Object.entries(bounds)) {
     if (params[key] !== undefined) integerInput(params[key], key, ...range);
+  }
+  if (experimentId === 'consensus-quorum') {
+    const size = params.clusterSize ?? 5;
+    if (size % 2 === 0) throw new InputError('clusterSize must be odd (3, 5, 7 or 9)');
+    if ((params.availableNodes ?? Math.min(3, size - 1)) >= size) {
+      throw new InputError('availableNodes must be smaller than clusterSize; the old leader is isolated');
+    }
   }
   for (const key of ['clientIp', 'sqlPayload', 'ssrfUrl', 'searchQuery']) {
     if (params[key] !== undefined) stringInput(params[key], key);

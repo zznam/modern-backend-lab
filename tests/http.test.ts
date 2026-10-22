@@ -35,6 +35,20 @@ describe('Dashboard → HTTP → labs', () => {
     if (experimentId === 'data-structures') expect(body.data).toMatchObject({ ringBuffer: [2, 3], minHeap: [1, 2, 3] });
   });
 
+  it.each([
+    ['consensus-quorum', { clusterSize: 5, availableNodes: 2 }, { elected: false }],
+    ['fencing-tokens', { pauseMs: 0 }, { expired: false, staleWriteAccepted: true }],
+    ['event-sourcing', { projectionBatch: 0 }, { lagging: { checkpoint: 0, balance: 0 } }],
+    ['snapshot-isolation', { onCallDoctors: 3 }, { snapshotIsolation: { invariantHolds: true } }],
+    ['backpressure', { producerRate: 1, consumerRate: 10, queueCapacity: 20 }, { loadShedding: { rejected: 0, queued: 0 } }],
+    ['slo-burn-rate', { sloBasisPoints: 9990, longErrorBasisPoints: 200, shortErrorBasisPoints: 0 }, { page: false }],
+  ])('honors custom %s controls through HTTP', async (experimentId, params, expected) => {
+    const response = await post('/api/experiments/run', { experimentId, params });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: unknown };
+    expect(body.data).toMatchObject(expected as Record<string, unknown>);
+  });
+
   it('serves the dashboard, health, readiness, metrics, and correlation headers', async () => {
     const home = await fetch(base);
     expect(await home.text()).toContain('Run Live Experiment');
@@ -53,6 +67,14 @@ describe('Dashboard → HTTP → labs', () => {
     { experimentId: 'load-stress-benchmark', params: { concurrency: 0 } },
     { experimentId: 'grpc-protobuf', params: { iterations: '1000' } },
     { experimentId: 'abac-authorization', params: { subject: {} } },
+    { experimentId: 'consensus-quorum', params: { clusterSize: 4 } },
+    { experimentId: 'consensus-quorum', params: { clusterSize: 3, availableNodes: 3 } },
+    { experimentId: 'fencing-tokens', params: { pauseMs: -1 } },
+    { experimentId: 'event-sourcing', params: { projectionBatch: 4 } },
+    { experimentId: 'snapshot-isolation', params: { onCallDoctors: 1 } },
+    { experimentId: 'backpressure', params: { queueCapacity: 1000000 } },
+    { experimentId: 'slo-burn-rate', params: { sloBasisPoints: 10000 } },
+    { experimentId: 'slo-burn-rate', params: { shortErrorBasisPoints: '200' } },
   ])('rejects malformed or unbounded requests: %j', async body => {
     const response = await post('/api/experiments/run', body);
     expect(response.status).toBe(400);

@@ -65,6 +65,12 @@ import { CircuitBreaker } from './04-devops-reliability/resilience/circuit-break
 import { RetryStrategies } from './04-devops-reliability/resilience/retry-backoff.js';
 import { globalShutdownCoordinator } from './04-devops-reliability/resilience/graceful-shutdown.js';
 import { runInProcessStressBenchmark } from './04-devops-reliability/load-testing/runner.js';
+import { runConsensusLab } from './05-advanced-systems/consensus.js';
+import { runFencingLab } from './05-advanced-systems/fencing.js';
+import { runEventSourcingLab } from './05-advanced-systems/event-sourcing.js';
+import { runSnapshotLab } from './05-advanced-systems/snapshot-isolation.js';
+import { runBackpressureLab } from './05-advanced-systems/backpressure.js';
+import { runSloLab } from './05-advanced-systems/slo-burn.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -200,6 +206,25 @@ app.post('/api/experiments/run', async (req, res) => {
     let result: any;
 
     switch (experimentId) {
+      // Track 5: deterministic advanced systems models
+      case 'consensus-quorum':
+        result = runConsensusLab(params.clusterSize, params.availableNodes);
+        break;
+      case 'fencing-tokens':
+        result = runFencingLab(params.pauseMs);
+        break;
+      case 'event-sourcing':
+        result = runEventSourcingLab(params.projectionBatch);
+        break;
+      case 'snapshot-isolation':
+        result = runSnapshotLab(params.onCallDoctors);
+        break;
+      case 'backpressure':
+        result = runBackpressureLab(params.producerRate, params.consumerRate, params.queueCapacity);
+        break;
+      case 'slo-burn-rate':
+        result = runSloLab(params.sloBasisPoints, params.longErrorBasisPoints, params.shortErrorBasisPoints);
+        break;
       // Track 1: Runtime & Systems
       case 'event-loop':
         result = await runEventLoopExperiment();
