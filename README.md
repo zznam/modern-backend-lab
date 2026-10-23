@@ -86,6 +86,18 @@ The four new data-systems labs include **scenario presets** that populate the co
 
 Use **Mark complete** to track learning explicitly, **Next topic** to follow the chosen path, and **Copy topic link** to share a URL such as `http://localhost:4000/#consensus-quorum`. Completion, the selected path, and the last viewed topic are saved in browser local storage; a valid URL fragment takes precedence on load. Storage failures fall back to session-only progress. No learning history is sent to the server.
 
+Open **Learning journey** in the header (or `/#journey`) for:
+
+- **XP and levels:** 20 XP for the first successful run of each lab and 50 XP per marked completion, with a new level every 250 XP. Undoing completion removes its XP; toggles and repeated runs cannot duplicate rewards.
+- **Daily quests:** choose a goal of 1, 3, or 5 distinct successful labs. Repeating the same lab on the same day counts once; revisiting it on another day counts toward that day's goal.
+- **Streaks and activity:** switch between 7-day and 28-day activity views, see daily distinct-lab totals and personal bests (longest streak, active days, busiest day), plus a consecutive active-day count using the device's local calendar. Yesterday's streak remains available until the end of today. Failed or canceled runs do not count.
+- **Path quests:** see all four guided paths, continue at the first unfinished lab, or revisit a completed path. Starting a quest clears conflicting search and difficulty filters.
+- **Weekly missions:** run five distinct labs (+60 XP), practice on three distinct days (+80 XP), or run a lab at each difficulty level (+100 XP). Claim each eligible reward once during its local Monday–Sunday week. Progress resets on Monday; claimed bonuses remain earned. Missions suggest a relevant lab, and the habit mission tells you when to return tomorrow.
+- **Skill tracks:** see explored and completed counts for foundations, applied engineering, and advanced systems. Continue at the first unfinished lab, with conflicting filters cleared, or revisit a completed track.
+- **Achievements:** ten milestones with earned/locked filters and visible requirements. New milestones reward a three-day best streak, a weekly claim, exploring all difficulty levels, and five advanced completions. Completion-based badges reflect current progress, including undo; historical streak and claim badges remain earned.
+
+Journey progress shares the existing browser-local learning record. Earlier completions automatically count toward XP; historical runs and dates are not invented. Only topic IDs, activity dates, goal/window preferences, and weekly claim IDs are saved; no experiment results or personal data are saved in the journey record or sent to a server. A blocked or full local store falls back to session-only progress. Date-based goals refresh when the tab regains focus and once a minute while visible.
+
 The server binds to `127.0.0.1` by default. Set `HOST=0.0.0.0` explicitly for containers or access from another device. `PORT` defaults to `4000`. The Docker image sets `HOST` automatically.
 
 This is a local teaching lab with intentionally vulnerable examples and expensive experiments, without application authentication. Use a trusted development environment. Orders, sessions, and simulations live in process memory; multiple replicas do not share those stores.

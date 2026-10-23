@@ -646,3 +646,89 @@ progress::-webkit-progress-value { background: linear-gradient(90deg, var(--acce
   .scenario-card, .run-comparison { padding: 12px; }
   .run-comparison th, .run-comparison td { padding: 7px 4px; }
 }
+
+/* A dedicated, browser-local learning journey. */
+#experiment-view { display: flex; flex-direction: column; gap: 24px; }
+#journey-view { display: flex; flex-direction: column; gap: 28px; max-width: 1280px; width: 100%; margin: 0 auto; }
+#journey-link { font-family: var(--font-sans); white-space: nowrap; border-color: #42677c; color: #bae6fd; }
+#journey-link[aria-current] { background: #153346; }
+#journey-xp { margin-left: 8px; font-size: 10px; color: #6ee7b7; }
+.journey-header, .journey-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.journey-header h2 { font-size: clamp(24px, 3vw, 34px); letter-spacing: -1px; margin: 8px 0; }
+.journey-header p, .journey-card p, .journey-hero p, .journey-section-heading > span { font-size: 13px; color: var(--text-muted); line-height: 1.7; }
+.journey-header button { flex-shrink: 0; }
+.journey-hero { display: grid; grid-template-columns: 1fr 1.2fr; align-items: center; gap: 32px; padding: 28px; border: 1px solid #315269; border-radius: 14px; background: radial-gradient(ellipse at top left, #15364b, transparent 75%), var(--bg-secondary); }
+.journey-hero h3 { font-size: 22px; margin: 12px 0 6px; }
+.journey-hero progress { margin-top: 16px; height: 7px; }
+.journey-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; text-align: center; }
+.journey-stats strong { display: block; font-size: clamp(22px, 2.4vw, 32px); color: #d6f8ed; white-space: nowrap; }
+.journey-stats span { display: block; font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+.journey-columns, .journey-quest-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.journey-card { padding: 22px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-secondary); min-width: 0; }
+.journey-card h3 { margin: 7px 0 18px; font-size: 18px; }
+.journey-card h4 { font-size: 15px; margin: 10px 0; }
+.journey-card label { font-size: 12px; margin-right: 10px; color: var(--text-muted); }
+.journey-card select { background: var(--bg-primary); color: var(--text-main); padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; font: inherit; font-size: 12px; max-width: 100%; }
+#daily-description { margin: 14px 0; }
+#daily-feedback { margin: 12px 0; color: #6ee7b7; }
+#daily-next { font-size: 12px; }
+.journey-week { list-style: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 22px 0; }
+.journey-week li { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 10px; color: var(--text-muted); }
+.activity-dot { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); font-size: 18px; }
+.journey-week .active .activity-dot { background: #133b32; border-color: #327360; color: #6ee7b7; }
+.journey-week [aria-current] .activity-dot { outline: 2px solid #7dd3fc; outline-offset: 2px; }
+.journey-section-heading { margin-bottom: 16px; }
+.journey-section h3 { font-size: 20px; margin-top: 7px; }
+.quest-card { display: flex; flex-direction: column; align-items: flex-start; }
+.quest-card progress { margin: 12px 0; }
+.quest-next { flex: 1; margin-bottom: 18px; }
+.badge-filters { display: flex; gap: 6px; }
+#badge-count { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+.journey-badge-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.journey-badge { display: flex; gap: 12px; padding: 18px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-secondary); }
+.journey-badge.earned { border-color: #327360; background: linear-gradient(125deg, #102b28, var(--bg-secondary)); }
+.badge-icon { font-size: 24px; color: var(--text-muted); }
+.earned .badge-icon, .earned .badge-state { color: #6ee7b7; }
+.badge-state { font-size: 10px; color: var(--text-muted); }
+.journey-badge h4 { font-size: 13px; margin: 7px 0; }
+.journey-badge p, .journey-fine, .journey-card .journey-fine, #badge-empty { font-size: 11px; color: var(--text-muted); line-height: 1.8; }
+.journey-fine p + p { margin-top: 8px; }
+.journey-fine strong { color: var(--text-main); }
+@media (max-width: 1200px) {
+  .journey-hero { grid-template-columns: 1fr; }
+  .journey-badge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .journey-columns { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .show-journey .sidebar { display: none; }
+  .journey-header, .journey-section-heading { align-items: flex-start; flex-direction: column; }
+  .journey-hero, .journey-card { padding: 18px; }
+  .journey-quest-grid, .journey-badge-grid { grid-template-columns: 1fr; }
+  .journey-stats { gap: 10px; }
+  .journey-stats strong { font-size: 22px; }
+  .journey-hero { gap: 24px; }
+  #journey-view { gap: 24px; }
+}
+
+@media (min-width: 701px) and (max-width: 1000px) {
+  .topbar { height: auto; min-height: 64px; }
+}
+
+/* Weekly rewards and skill tracks extend the same quiet learning dashboard. */
+.journey-triple-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.mission-card, .skill-card { display: flex; flex-direction: column; align-items: flex-start; }
+.mission-card > p:first-of-type { flex: 1; }
+.mission-card progress, .skill-card progress { margin: 16px 0 10px; }
+.mission-card button { margin-top: 16px; font-size: 12px; }
+.mission-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
+.xp-reward { color: #6ee7b7; background: #12372f; border-radius: 20px; padding: 5px 9px; font: 11px var(--font-mono); white-space: nowrap; }
+.mission-card.ready { border-color: #64bca2; }
+.mission-card.claimed { border-color: #327360; background: linear-gradient(135deg, #102b28, var(--bg-secondary)); }
+.mission-card button:disabled { opacity: 0.7; cursor: default; }
+#mission-feedback { color: #6ee7b7; font-size: 13px; margin: 12px 0; }
+#mission-feedback:empty { margin: 0; }
+.personal-records { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 14px 0; border-top: 1px solid var(--border-color); }
+.personal-records dt { font-size: 10px; color: var(--text-muted); }
+.personal-records dd { margin: 6px 0 0; color: #d6f8ed; font-size: 15px; }
+.skill-card .quest-next { margin-top: 8px; }
+@media (max-width: 1200px) { .journey-triple-grid { grid-template-columns: 1fr; } }
