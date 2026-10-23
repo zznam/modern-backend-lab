@@ -316,6 +316,19 @@ describe('Local quest tools, recommendations and portable progress', () => {
     expect(journey.state.runs).toEqual([]);
   });
 
+  it('restores default journey preferences while preserving existing choices on merge', () => {
+    const preferences = { goal: 5, range: 28, reviewInterval: 14, activeChallenge: 'incident', pinnedBadge: 'discovery' };
+    const source = setup({}, preferences);
+    const target = setup({}, { goal: 3, range: 7, reviewInterval: 7, activeChallenge: null, pinnedBadge: null });
+    expect(target.engine.importData(source.engine.exportData()).ok).toBe(true);
+    expect(target.journey.state).toMatchObject(preferences);
+
+    const existing = { goal: 1, range: 28, reviewInterval: 3, activeChallenge: 'integrity', pinnedBadge: 'explorer' };
+    const customized = setup({}, existing);
+    expect(customized.engine.importData(source.engine.exportData()).ok).toBe(true);
+    expect(customized.journey.state).toMatchObject(existing);
+  });
+
   it('resets only quest progress and preserves existing journey, completion and notes outside quests', () => {
     const { engine, journey, completed, run } = setup();
     run(keys[0]); completed.add(keys[0]);

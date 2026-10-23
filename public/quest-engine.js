@@ -365,6 +365,10 @@ class QuestEngine {
     }
     const combinedJourney = { ...incomingJourney, ...currentJourney, days: combinedDays,
       runs: this.knownList([...this.knownList(currentJourney.runs), ...this.knownList(incomingJourney.runs)]) };
+    const journeyDefaults = { goal: 3, range: 7, reviewInterval: 7, activeChallenge: null, pinnedBadge: null };
+    for (const [field, value] of Object.entries(journeyDefaults)) {
+      if (currentJourney[field] === undefined || currentJourney[field] === value) combinedJourney[field] = incomingJourney[field] ?? value;
+    }
     for (const field of ['claims', 'challenges']) {
       combinedJourney[field] = { ...this.object(incomingJourney[field]), ...this.object(currentJourney[field]) };
     }

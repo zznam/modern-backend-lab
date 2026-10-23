@@ -12,6 +12,7 @@ class QuestHub {
     this.aliasDraft = engine.state.alias;
     this.noteDrafts = {};
     this.answerDrafts = {};
+    this.disclosureState = new Map();
     this.resetPending = false;
     this.month = this.localMonth();
     this.root.innerHTML = `<div class="qh-header"><div><span class="eyebrow">Make progress your own</span><h3 id="quest-hub-title" tabindex="-1">Quest hub</h3><p>Small challenges. Useful practice. A journey that belongs to you.</p></div><div class="qh-wallet" aria-label="Your quest coins"><span aria-hidden="true">✦</span> <strong data-qh-wallet>0</strong><span>coins</span></div></div>
@@ -71,9 +72,15 @@ class QuestHub {
       button.tabIndex = selected ? 0 : -1;
     });
     const panel = this.root.querySelector('#qh-panel');
+    panel.querySelectorAll('details[data-qh-details]').forEach(details => {
+      this.disclosureState.set(details.dataset.qhDetails, details.open);
+    });
     panel.setAttribute('aria-labelledby', `qh-tab-${this.tab}`);
     const html = this[`${this.tab}View`]();
     if (panel.innerHTML !== html) panel.innerHTML = html;
+    panel.querySelectorAll('details[data-qh-details]').forEach(details => {
+      details.open = this.disclosureState.get(details.dataset.qhDetails) === true;
+    });
     if (focusKey) {
       const replacement = [...this.root.querySelectorAll('[data-qh-focus]')].find(element => element.dataset.qhFocus === focusKey);
       if (replacement && !replacement.disabled) {
@@ -144,7 +151,7 @@ class QuestHub {
     const current = sprint?.started === today;
     const live = current && sprint.status !== 'complete';
     const rewarded = !!state.sprintRewards[today];
-    return `<article class="qh-card"><span class="eyebrow">Focus sprint</span><h4>A little structure, at your pace</h4><p>Successfully run distinct labs toward a small daily target. No countdown, no pressure. Pause and resume during the same day.</p>${sprint ? `<div class="qh-card-meta"><strong>${sprint.topics.length} / ${sprint.target} labs</strong><span class="qh-pill">${current ? sprint.status === 'complete' ? 'Completed today' : this.escape(sprint.status) : 'Previous sprint'}</span></div>${this.progress(sprint.topics.length, sprint.target, 'Focus sprint progress')}<ul class="qh-compact-list">${sprint.topics.map(key => `<li>✓ ${this.escape(this.title(key))}</li>`).join('')}</ul>${live ? `<div class="qh-actions">${this.button('toggle-sprint', sprint.status === 'paused' ? 'Resume sprint' : 'Pause sprint')}${this.button('cancel-sprint', 'End sprint')}</div>` : ''}` : ''}${rewarded ? '<p class="qh-reward">✓ Daily sprint reward earned. Start a fresh sprint tomorrow.</p>' : !live ? `<div class="qh-actions">${[2, 3, 5].map(target => this.button('start-sprint', `${target}-lab sprint`, target, { primary: target === 3 })).join('')}</div><p class="qh-footnote">Earn 15 XP and 10 coins per target lab, once per day.</p>` : `<p class="qh-footnote">Finish this sprint for ${sprint.target * 15} XP and ${sprint.target * 10} coins.</p>`}<p class="qh-muted">${rewards.length} finished · Personal best: ${rewards.length ? Math.max(...rewards.map(item => item.target)) : 0} distinct labs in a sprint</p>${history.length ? `<details><summary>Completed sprint history</summary><ul class="qh-compact-list">${history.slice(-8).reverse().map(item => `<li>${this.escape(item.started)} · ${item.target} labs</li>`).join('')}</ul></details>` : ''}</article>`;
+    return `<article class="qh-card"><span class="eyebrow">Focus sprint</span><h4>A little structure, at your pace</h4><p>Successfully run distinct labs toward a small daily target. No countdown, no pressure. Pause and resume during the same day.</p>${sprint ? `<div class="qh-card-meta"><strong>${sprint.topics.length} / ${sprint.target} labs</strong><span class="qh-pill">${current ? sprint.status === 'complete' ? 'Completed today' : this.escape(sprint.status) : 'Previous sprint'}</span></div>${this.progress(sprint.topics.length, sprint.target, 'Focus sprint progress')}<ul class="qh-compact-list">${sprint.topics.map(key => `<li>✓ ${this.escape(this.title(key))}</li>`).join('')}</ul>${live ? `<div class="qh-actions">${this.button('toggle-sprint', sprint.status === 'paused' ? 'Resume sprint' : 'Pause sprint')}${this.button('cancel-sprint', 'End sprint')}</div>` : ''}` : ''}${rewarded ? '<p class="qh-reward">✓ Daily sprint reward earned. Start a fresh sprint tomorrow.</p>' : !live ? `<div class="qh-actions">${[2, 3, 5].map(target => this.button('start-sprint', `${target}-lab sprint`, target, { primary: target === 3 })).join('')}</div><p class="qh-footnote">Earn 15 XP and 10 coins per target lab, once per day.</p>` : `<p class="qh-footnote">Finish this sprint for ${sprint.target * 15} XP and ${sprint.target * 10} coins.</p>`}<p class="qh-muted">${rewards.length} finished · Personal best: ${rewards.length ? Math.max(...rewards.map(item => item.target)) : 0} distinct labs in a sprint</p>${history.length ? `<details data-qh-details="sprint-history"><summary data-qh-focus="sprint-history">Completed sprint history</summary><ul class="qh-compact-list">${history.slice(-8).reverse().map(item => `<li>${this.escape(item.started)} · ${item.target} labs</li>`).join('')}</ul></details>` : ''}</article>`;
   }
 
   practiceView() {

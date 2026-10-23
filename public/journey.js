@@ -324,6 +324,10 @@ class LearningJourney {
   }
 
   render() {
+    // Backups can replace preferences after the controls were first initialized.
+    document.getElementById('daily-goal').value = String(this.state.goal);
+    document.getElementById('activity-range').value = String(this.state.range);
+    document.getElementById('review-interval').value = String(this.state.reviewInterval);
     const focused = document.activeElement;
     const focusAttribute = ['data-quest', 'data-mission', 'data-skill-topic', 'data-challenge', 'data-review-topic', 'data-pin-badge'].find(name => focused?.hasAttribute(name));
     const focusValue = focusAttribute && focused.getAttribute(focusAttribute);

@@ -136,6 +136,47 @@ describe('Quest hub application integration', () => {
 });
 
 describe('Quest hub regression interactions', () => {
+  it('restores validated journey preferences and their visible controls through file import', async () => {
+    const source = load();
+    source.win.eval(`learning.state.goal = 5; learning.state.range = 28; learning.state.reviewInterval = 14;
+      learning.state.challenges.incident = { started: learning.dateKey(), steps: [], claimed: false };
+      learning.state.activeChallenge = 'incident'; learning.state.pinnedBadge = 'discovery';
+      learning.recordRun('event-loop');`);
+    const backup = source.win.eval('quests.exportData()');
+    const target = load();
+    await target.win.eval(`hub.importFile({ size: ${Buffer.byteLength(backup)}, text: async () => ${JSON.stringify(backup)} })`);
+    expect(target.win.eval('learning.state')).toMatchObject({ goal: 5, range: 28, reviewInterval: 14, activeChallenge: 'incident', pinnedBadge: 'discovery' });
+    expect(target.el('#daily-goal').value).toBe('5');
+    expect(target.el('#activity-range').value).toBe('28');
+    expect(target.el('#review-interval').value).toBe('14');
+    expect(JSON.parse(target.saved()).journey.activeChallenge).toBe('incident');
+
+    const invalid = JSON.parse(backup);
+    Object.assign(invalid.journey, { goal: 99, range: 99, reviewInterval: 99, activeChallenge: 'unknown', pinnedBadge: 'unknown' });
+    const fresh = load();
+    fresh.win.eval(`quests.importData(${JSON.stringify(JSON.stringify(invalid))}); learning.render()`);
+    expect(fresh.win.eval('learning.state')).toMatchObject({ goal: 3, range: 7, reviewInterval: 7, activeChallenge: null, pinnedBadge: null });
+    expect(fresh.el('#daily-goal').value).toBe('3');
+    expect(fresh.el('#activity-range').value).toBe('7');
+    expect(fresh.el('#review-interval').value).toBe('7');
+  });
+
+  it('keeps sprint history expanded and keyboard focus stable through refreshes', () => {
+    const ui = load();
+    ui.win.eval("quests.startSprint(2); learning.recordRun('event-loop'); learning.recordRun('data-structures'); hub.open('practice')");
+    ui.el('[data-qh-details="sprint-history"]').open = true;
+    ui.el('[data-qh-focus="sprint-history"]').focus();
+    ui.win.dispatchEvent(new ui.win.Event('focus'));
+    expect(ui.el('[data-qh-details="sprint-history"]').open).toBe(true);
+    expect(ui.win.document.activeElement).toBe(ui.el('[data-qh-focus="sprint-history"]'));
+    ui.el('[data-qh-tab="overview"]').click();
+    ui.el('[data-qh-tab="practice"]').click();
+    expect(ui.el('[data-qh-details="sprint-history"]').open).toBe(true);
+    ui.el('[data-qh-details="sprint-history"]').open = false;
+    ui.win.dispatchEvent(new ui.win.Event('focus'));
+    expect(ui.el('[data-qh-details="sprint-history"]').open).toBe(false);
+  });
+
   it('retries a missed quiz without switching questions and retains draft answers through refresh', () => {
     const ui = load();
     ui.el('[data-qh-tab="knowledge"]').click();
