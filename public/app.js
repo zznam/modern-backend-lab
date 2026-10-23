@@ -337,6 +337,58 @@ const journey = new LearningJourney({
   },
 });
 
+const questEngine = new QuestEngine({
+  topics: EXPERIMENTS_CONFIG, stored: savedLearning.quests, journey, completed: completedTopics,
+});
+journey.quest = questEngine;
+const questHub = new QuestHub({
+  engine: questEngine,
+  onChange: () => { updateCurriculum(); saveLearning(); },
+  onTopic: key => {
+    if (!Object.hasOwn(EXPERIMENTS_CONFIG, key)) return;
+    pathSelect.value = levelSelect.value = statusSelect.value = 'all';
+    searchInput.value = '';
+    selectExperiment(key);
+    document.getElementById('exp-title').focus();
+  },
+});
+journey.onQuestRender = () => { questHub.render(); renderQuestTools(); };
+
+function renderQuestTools() {
+  const favorite = questEngine.state.favorites.includes(currentExpKey);
+  const queued = questEngine.state.queue.includes(currentExpKey);
+  const favoriteButton = document.getElementById('quest-lab-favorite');
+  favoriteButton.setAttribute('aria-pressed', String(favorite));
+  favoriteButton.textContent = favorite ? '★ Favorite lab' : '☆ Favorite lab';
+  const queueButton = document.getElementById('quest-lab-queue');
+  queueButton.setAttribute('aria-pressed', String(queued));
+  queueButton.textContent = queued ? 'Remove from practice queue' : 'Add to practice queue';
+  const campaign = questEngine.state.activeCampaign && questEngine.campaignProgress(questEngine.state.activeCampaign);
+  const sprint = questEngine.state.sprint;
+  const parts = [];
+  if (campaign) parts.push(`${campaign.title}: ${campaign.value} / ${campaign.max} labs`);
+  if (sprint?.started === questEngine.dateKey() && ['active', 'paused'].includes(sprint.status)) parts.push(`Focus sprint (${sprint.status}): ${sprint.topics.length} / ${sprint.target} labs`);
+  document.getElementById('quest-run-tracker').hidden = !parts.length;
+  document.getElementById('quest-run-status').textContent = parts.join(' · ');
+}
+document.getElementById('quest-lab-favorite').addEventListener('click', () => {
+  questEngine.toggleFavorite(currentExpKey);
+  journey.render(); saveLearning();
+  document.getElementById('quest-lab-feedback').textContent = questEngine.state.favorites.includes(currentExpKey) ? 'Lab added to favorites.' : 'Lab removed from favorites.';
+});
+document.getElementById('quest-lab-queue').addEventListener('click', () => {
+  if (questEngine.state.queue.includes(currentExpKey)) questEngine.dequeue(currentExpKey);
+  else questEngine.enqueue(currentExpKey);
+  journey.render(); saveLearning();
+  document.getElementById('quest-lab-feedback').textContent = questEngine.state.queue.includes(currentExpKey) ? 'Lab added to your practice queue.' : 'Lab removed from your practice queue.';
+});
+document.getElementById('quest-lab-reflect').addEventListener('click', () => {
+  questHub.open('practice', currentExpKey);
+  location.hash = 'journey';
+  showJourney(false);
+  document.getElementById('quest-hub-title')?.focus();
+});
+
 function showJourney(focus = true) {
   resetRunDisplay();
   document.getElementById('experiment-view').hidden = true;
@@ -358,7 +410,7 @@ function pathTopics() {
 
 function saveLearning() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: [...completedTopics], lastTopic: currentExpKey, path: pathSelect.value, journey: journey.state }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: [...completedTopics], lastTopic: currentExpKey, path: pathSelect.value, journey: journey.state, quests: questEngine.state }));
   } catch {
     document.querySelector('.local-note').textContent = 'Session only';
     document.getElementById('journey-storage').textContent = 'Storage unavailable. Progress lasts only for this session.';
@@ -513,6 +565,7 @@ function selectExperiment(key, updateHash = true) {
     ? '<span>Builds on:</span> ' + cfg.prerequisites.map(topic => `<button class="topic-link" data-topic="${topic}">${escapeHtml(EXPERIMENTS_CONFIG[topic].title)}</button>`).join('')
     : '<span>No prerequisites · start here</span>';
   document.getElementById('link-feedback').textContent = '';
+  document.getElementById('quest-lab-feedback').textContent = '';
   controlsContainer.innerHTML = cfg.controlsHtml || '<span style="color:var(--text-dim);font-size:13px;">No custom parameters required for this experiment.</span>';
   controlsContainer.querySelectorAll('.control-group').forEach(group => {
     const input = group.querySelector('input, select');
