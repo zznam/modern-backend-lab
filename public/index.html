@@ -210,6 +210,9 @@
             <div><span class="eyebrow">Your engineering journey</span><h3 id="journey-level"></h3><p id="journey-level-note"></p><progress id="journey-level-progress" max="250" value="0" aria-label="Progress to next level"></progress></div>
             <div class="journey-stats"><div><strong id="journey-total-xp">0</strong><span>Total XP</span></div><div><strong id="journey-completed">0</strong><span>Labs completed</span></div><div><strong id="journey-streak">0</strong><span>Day streak</span></div></div>
           </section>
+          <aside class="journey-showcase" aria-label="Achievement showcase"><span id="showcase-icon" class="badge-icon" aria-hidden="true">◇</span><div><span class="eyebrow">Your showcase</span><h3 id="showcase-title"></h3><p id="showcase-description"></p></div></aside>
+          <p id="showcase-feedback" class="journey-feedback" role="status" aria-live="polite" tabindex="-1"></p>
+          <nav class="journey-jumps" aria-label="Journey sections"><button class="secondary-btn" data-journey-section="challenge-title">Scenario challenges</button><button class="secondary-btn" data-journey-section="review-title">Practice review</button><button class="secondary-btn" data-journey-section="weekly-title">Weekly missions</button><button class="secondary-btn" data-journey-section="badges-title">Achievements</button></nav>
           <div class="journey-columns">
             <section class="journey-card" aria-labelledby="daily-title">
               <span class="eyebrow">Make time for discovery</span><h3 id="daily-title">Today’s quest</h3>
@@ -222,8 +225,17 @@
               <dl class="personal-records"><div><dt>Best streak</dt><dd id="record-streak">0 days</dd></div><div><dt>Active days</dt><dd id="record-days">0</dd></div><div><dt>Best day</dt><dd id="record-labs">0 labs</dd></div></dl><p id="streak-description"></p><p class="journey-fine">One successful run keeps your streak going. Days follow your device’s local time.</p>
             </section>
           </div>
+          <section class="journey-section" aria-labelledby="challenge-title">
+            <div class="journey-section-heading"><div><span class="eyebrow">Put your skills together</span><h3 id="challenge-title" tabindex="-1">Scenario challenges</h3></div><div class="challenge-toolbar"><span id="challenge-active"></span><button id="challenge-pause" class="secondary-btn" hidden>Pause challenge</button></div></div>
+            <p class="journey-fine section-intro">Accept a challenge, then successfully run its three labs in any order. Only the active challenge advances. Switching or pausing keeps your steps; earlier runs do not count.</p>
+            <div id="challenge-board" class="journey-triple-grid"></div><p id="challenge-feedback" class="journey-feedback" role="status" aria-live="polite" tabindex="-1"></p>
+          </section>
+          <section class="journey-section journey-card" aria-labelledby="review-title">
+            <div class="journey-section-heading"><div><span class="eyebrow">Keep it fresh</span><h3 id="review-title" tabindex="-1">Practice review <span id="review-count"></span></h3></div><div><label for="review-interval">Review after</label><select id="review-interval"><option value="3">3 days</option><option value="7">7 days</option><option value="14">14 days</option></select></div></div>
+            <p id="review-summary"></p><ul id="review-queue" class="review-queue"></ul><p class="journey-fine">Based on your last successful run, using local calendar days. Reviews count toward daily goals and streaks; first-run XP is awarded only once.</p>
+          </section>
           <section class="journey-section" aria-labelledby="weekly-title">
-            <div class="journey-section-heading"><div><span class="eyebrow">A little further, every week</span><h3 id="weekly-title">Weekly missions</h3></div><span id="weekly-dates"></span></div>
+            <div class="journey-section-heading"><div><span class="eyebrow">A little further, every week</span><h3 id="weekly-title" tabindex="-1">Weekly missions</h3></div><span id="weekly-dates"></span></div>
             <div id="weekly-missions" class="journey-triple-grid"></div><p id="mission-feedback" role="status" aria-live="polite" tabindex="-1"></p>
             <p class="journey-fine">Claim each reward once before the week ends. Successful runs count; repeating a lab does not add variety. Weeks follow your device’s local time.</p>
           </section>
@@ -231,10 +243,11 @@
             <div class="journey-section-heading"><div><span class="eyebrow">From fundamentals to distributed systems</span><h3 id="skills-title">Your skill tracks</h3></div><span>Mark labs complete to advance</span></div><div id="skill-tracks" class="journey-triple-grid"></div>
           </section>
           <section class="journey-section" aria-labelledby="quests-title"><div class="journey-section-heading"><div><span class="eyebrow">Choose your next challenge</span><h3 id="quests-title">Path quests</h3></div><span>Complete labs to finish a quest</span></div><div id="journey-quests" class="journey-quest-grid"></div></section>
-          <section class="journey-section" aria-labelledby="badges-title"><div class="journey-section-heading"><div><span class="eyebrow">Milestones that matter</span><h3 id="badges-title">Achievement collection <span id="badge-count"></span></h3></div><div id="badge-filters" class="badge-filters" role="group" aria-label="Filter achievements"><button class="secondary-btn" data-badge-filter="all" aria-pressed="true">All</button><button class="secondary-btn" data-badge-filter="earned" aria-pressed="false">Earned</button><button class="secondary-btn" data-badge-filter="locked" aria-pressed="false">Locked</button></div></div><div id="journey-badges" class="journey-badge-grid"></div><p id="badge-empty" hidden>No achievements here yet. Try a lab to get started.</p></section>
-          <footer class="journey-fine"><p><strong>How XP works:</strong> +20 for the first successful run of each lab, +50 for each lab marked complete. Undoing completion removes its 50 XP. Every 250 XP earns a level. Weekly missions award an extra 60, 80, or 100 XP when claimed, once per mission per week. Claimed bonuses stay earned. Repeated runs support your daily goal but never duplicate first-run XP.</p><p id="journey-storage">Saved only in this browser. No account or leaderboard. Existing completed labs count toward XP; earlier runs and dates cannot be reconstructed.</p></footer>
+          <section class="journey-section" aria-labelledby="badges-title"><div class="journey-section-heading"><div><span class="eyebrow">Milestones that matter</span><h3 id="badges-title" tabindex="-1">Achievement collection <span id="badge-count"></span></h3></div><div id="badge-filters" class="badge-filters" role="group" aria-label="Filter achievements"><button class="secondary-btn" data-badge-filter="all" aria-pressed="true">All</button><button class="secondary-btn" data-badge-filter="earned" aria-pressed="false">Earned</button><button class="secondary-btn" data-badge-filter="locked" aria-pressed="false">Locked</button></div></div><div id="journey-badges" class="journey-badge-grid"></div><p id="badge-empty" hidden>No achievements here yet. Try a lab to get started.</p></section>
+          <footer class="journey-fine"><p><strong>How XP works:</strong> +20 for the first successful run of each lab, +50 for each lab marked complete. Undoing completion removes its 50 XP. Every 250 XP earns a level. Weekly missions award an extra 60, 80, or 100 XP when claimed, once per mission per week. Each scenario challenge awards 120 XP once after you accept it, run all three labs, and claim the reward. Claimed bonuses stay earned. Repeated runs support your daily goal but never duplicate first-run XP.</p><p id="journey-storage">Saved only in this browser. No account or leaderboard. Existing completed labs count toward XP; earlier runs and dates cannot be reconstructed.</p></footer>
         </section>
         <section id="experiment-view" aria-label="Current experiment">
+        <aside id="challenge-tracker" class="challenge-tracker" hidden><span id="challenge-tracker-text" role="status" aria-live="polite"></span><a href="#journey">View challenge →</a></aside>
         <div class="experiment-header">
           <div class="title-cluster">
             <div class="topic-badges"><span class="badge" id="exp-category">Pillar 1: Runtime</span><span class="level-badge" id="exp-level">Foundation</span></div>

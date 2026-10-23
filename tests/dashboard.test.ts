@@ -647,3 +647,168 @@ describe('Weekly missions, skill tracks, and personal records', () => {
     expect(ui.el('#journey-storage').textContent).toContain('only for this session');
   });
 });
+
+describe('Scenario challenges, review practice, and achievement showcase', () => {
+  const state = (ui: ReturnType<typeof load>) => JSON.parse(ui.win.localStorage.getItem(storageKey)!).journey;
+  const record = (ui: ReturnType<typeof load>, keys: string[]) => {
+    ui.win.eval(`${JSON.stringify(keys)}.forEach(key => testJourney.recordRun(key))`);
+  };
+  function clock(ui: ReturnType<typeof load>, date: string) {
+    ui.win.eval(`window.RealDate ||= Date; window.clock = new RealDate('${date}T12:00:00');
+      Date = class extends RealDate { constructor(...args) { super(...(args.length ? args : [clock])); } };
+      testJourney.render();`);
+  }
+
+  it('starts fresh, counts only active challenge runs, and retains steps across switches and reloads', () => {
+    const ui = load('#journey');
+    record(ui, ['rate-limiting']);
+    ui.change('#topic-search', 'missing');
+    ui.change('#topic-level', 'foundation');
+    ui.el('[data-challenge="incident"]').click();
+    expect(ui.shown()).toHaveLength(46);
+    expect(ui.win.location.hash).toBe('#rate-limiting');
+    expect(state(ui).challenges.incident.steps).toEqual([]);
+    expect(ui.el('#challenge-tracker').hidden).toBe(false);
+    record(ui, ['rate-limiting', 'rate-limiting', 'event-loop']);
+    expect(state(ui).challenges.incident.steps).toEqual(['rate-limiting']);
+    ui.el('[data-challenge="integrity"]').click();
+    record(ui, ['circuit-breaker', 'acid-transactions']);
+    expect(state(ui).challenges.incident.steps).toEqual(['rate-limiting']);
+    expect(state(ui).challenges.integrity.steps).toEqual(['acid-transactions']);
+    ui.el('#challenge-pause').click();
+    expect(state(ui).activeChallenge).toBeNull();
+    expect(ui.win.document.activeElement?.id).toBe('challenge-feedback');
+    expect(ui.el('#challenge-tracker').hidden).toBe(true);
+    record(ui, ['outbox-pattern']);
+    expect(state(ui).challenges.integrity.steps).toEqual(['acid-transactions']);
+    const resumed = load('#journey', ui.win.localStorage.getItem(storageKey)!);
+    resumed.el('[data-challenge="incident"]').click();
+    expect(resumed.win.location.hash).toBe('#circuit-breaker');
+    expect(state(resumed).activeChallenge).toBe('incident');
+  });
+
+  it('awards a challenge once, supports out-of-order runs, and preserves claims after reload and revisit', () => {
+    const ui = load('#journey');
+    ui.win.eval("testJourney.claimChallenge('incident'); testJourney.claimChallenge('__proto__')");
+    ui.el('[data-challenge="incident"]').click();
+    record(ui, ['retry-backoff', 'rate-limiting']);
+    ui.win.eval("testJourney.claimChallenge('incident')");
+    expect(ui.el('#journey-total-xp').textContent).toBe('40');
+    record(ui, ['circuit-breaker']);
+    expect(ui.el('#challenge-tracker-text').textContent).toContain('Reward ready');
+    const claim = ui.el('[data-challenge="incident"]');
+    claim.focus();
+    claim.click();
+    ui.win.eval("testJourney.claimChallenge('incident')");
+    expect(ui.el('#journey-total-xp').textContent).toBe('180');
+    expect(ui.win.document.activeElement?.id).toBe('challenge-feedback');
+    expect(state(ui).activeChallenge).toBeNull();
+    const resumed = load('#journey', ui.win.localStorage.getItem(storageKey)!);
+    expect(resumed.el('#journey-total-xp').textContent).toBe('180');
+    resumed.el('[data-challenge="incident"]').click();
+    record(resumed, ['rate-limiting']);
+    expect(state(resumed).activeChallenge).toBeNull();
+    expect(resumed.el('#journey-total-xp').textContent).toBe('180');
+  });
+
+  it('does not advance a challenge after failed or canceled API requests', async () => {
+    const ui = load('#journey');
+    ui.el('[data-challenge="incident"]').click();
+    ui.fetch.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Failed' }) });
+    ui.el('#run-btn').click();
+    await vi.waitFor(() => expect(ui.el('#exec-status').textContent).toBe('Error'));
+    expect(state(ui).challenges.incident.steps).toEqual([]);
+    let finish!: (value: unknown) => void;
+    ui.fetch.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    ui.el('#run-btn').click();
+    ui.win.location.hash = 'journey';
+    await vi.waitFor(() => expect(ui.el('#journey-view').hidden).toBe(false));
+    finish({ ok: true, json: async () => ({ data: {}, executionDurationMs: 1 }) });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(state(ui).challenges.incident.steps).toEqual([]);
+  });
+
+  it('normalizes invalid challenge data, unsupported preferences, and claims lacking dated evidence', () => {
+    const ui = load('#journey', JSON.stringify({ journey: {
+      activeChallenge: '__proto__', reviewInterval: 0, pinnedBadge: '<img onerror=alert(1)>',
+      days: { '2026-02-01': ['rate-limiting'], '2026-02-03': ['circuit-breaker', 'retry-backoff'] },
+      challenges: {
+        incident: { started: '2026-02-02', steps: ['rate-limiting', 'circuit-breaker', 'circuit-breaker', 'retry-backoff', '__proto__'], claimed: true },
+        integrity: { started: '2026-02-30', steps: [], claimed: true },
+        defender: { started: '2999-01-01', steps: [], claimed: true },
+      },
+    } }));
+    expect(state(ui).challenges).toEqual({ incident: { started: '2026-02-02', steps: ['circuit-breaker', 'retry-backoff'], claimed: false } });
+    expect(state(ui).activeChallenge).toBeNull();
+    expect(state(ui).pinnedBadge).toBeNull();
+    expect(state(ui).reviewInterval).toBe(7);
+    expect(ui.el('#journey-total-xp').textContent).toBe('0');
+  });
+
+  it('schedules the oldest dated runs, honors calendar boundaries, and removes a successful review without repeat XP', () => {
+    const ui = load('#journey', JSON.stringify({ journey: { runs: ['event-loop', 'data-structures', 'protocols'], days: {
+      '2026-02-27': ['event-loop'], '2026-02-28': ['data-structures'],
+    } } }));
+    clock(ui, '2026-03-06');
+    expect(ui.el('#review-count').textContent).toBe('1 lab due');
+    expect(ui.el('[data-review-topic]').dataset.reviewTopic).toBe('event-loop');
+    clock(ui, '2026-03-07');
+    expect(ui.el('#review-count').textContent).toBe('2 labs due');
+    ui.el('[data-review-topic="event-loop"]').focus();
+    ui.win.dispatchEvent(new ui.win.Event('focus'));
+    expect(ui.win.document.activeElement?.getAttribute('data-review-topic')).toBe('event-loop');
+    ui.change('#topic-search', 'absent');
+    ui.el('[data-review-topic="event-loop"]').click();
+    expect(ui.shown()).toHaveLength(46);
+    expect(ui.win.location.hash).toBe('#event-loop');
+    record(ui, ['event-loop']);
+    expect(ui.el('#review-count').textContent).toBe('1 lab due');
+    expect(ui.el('#journey-total-xp').textContent).toBe('60');
+    ui.change('#review-interval', '14');
+    expect(ui.el('#review-count').textContent).toBe('0 labs due');
+    const resumed = load('#journey', ui.win.localStorage.getItem(storageKey)!);
+    expect(resumed.el('#review-interval').value).toBe('14');
+    expect(state(resumed).days['2026-03-07']).toEqual(['event-loop']);
+  });
+
+  it('refreshes a review across a daylight-saving boundary using calendar days', () => {
+    const ui = load('#journey', JSON.stringify({ journey: { reviewInterval: 3, days: { '2026-03-06': ['event-loop'] } } }));
+    clock(ui, '2026-03-08');
+    expect(ui.el('#review-count').textContent).toBe('0 labs due');
+    clock(ui, '2026-03-09');
+    ui.win.dispatchEvent(new ui.win.Event('focus'));
+    expect(ui.el('#review-count').textContent).toBe('1 lab due');
+  });
+
+  it('pins only earned achievements, retains the choice on reload, and hides a badge when completion is undone', () => {
+    const ui = load('#journey');
+    expect(ui.win.document.querySelector('[data-pin-badge]')).toBeNull();
+    ui.el('#mark-complete').click();
+    ui.el('[data-pin-badge="start"]').focus();
+    ui.el('[data-pin-badge="start"]').click();
+    expect(ui.el('#showcase-title').textContent).toBe('A solid start');
+    expect(ui.win.document.activeElement?.getAttribute('data-pin-badge')).toBe('start');
+    const resumed = load('#journey', ui.win.localStorage.getItem(storageKey)!);
+    expect(resumed.el('#showcase-title').textContent).toBe('A solid start');
+    resumed.el('#mark-complete').click();
+    expect(resumed.el('#showcase-title').textContent).toBe('Make this journey yours');
+    resumed.el('#mark-complete').click();
+    expect(resumed.el('#showcase-title').textContent).toBe('A solid start');
+    resumed.el('[data-pin-badge="start"]').click();
+    expect(state(resumed).pinnedBadge).toBeNull();
+  });
+
+  it('keeps new features usable without storage and keeps section navigation on the journey route', () => {
+    const ui = load('#journey', undefined, true);
+    ui.el('[data-journey-section="review-title"]').click();
+    expect(ui.win.location.hash).toBe('#journey');
+    expect(ui.win.document.activeElement?.id).toBe('review-title');
+    ui.el('[data-challenge="defender"]').click();
+    record(ui, ['auth-jwt-rotation', 'abac-authorization', 'owasp-lab']);
+    ui.el('[data-challenge="defender"]').click();
+    expect(ui.el('#journey-total-xp').textContent).toBe('180');
+    ui.el('[data-pin-badge="discovery"]').click();
+    expect(ui.el('#showcase-title').textContent).toBe('First discovery');
+    expect(ui.el('#journey-storage').textContent).toContain('only for this session');
+  });
+});
