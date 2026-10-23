@@ -732,3 +732,36 @@ progress::-webkit-progress-value { background: linear-gradient(90deg, var(--acce
 .personal-records dd { margin: 6px 0 0; color: #d6f8ed; font-size: 15px; }
 .skill-card .quest-next { margin-top: 8px; }
 @media (max-width: 1200px) { .journey-triple-grid { grid-template-columns: 1fr; } }
+
+/* Scenario challenges, review practice, and a personal achievement showcase. */
+.journey-showcase { display: flex; align-items: center; gap: 18px; border: 1px solid #38586d; border-radius: 12px; padding: 20px 24px; background: linear-gradient(110deg, #142d38, var(--bg-secondary)); }
+.journey-showcase .badge-icon { color: #7dd3fc; font-size: 32px; }
+.journey-showcase h3 { font-size: 16px; margin: 6px 0; }
+.journey-showcase p { color: var(--text-muted); font-size: 12px; line-height: 1.7; }
+.journey-jumps { display: flex; flex-wrap: wrap; gap: 8px; }
+.journey-feedback { color: #6ee7b7; font-size: 13px; line-height: 1.7; }
+.journey-feedback:empty { display: none; }
+.section-intro { margin-bottom: 16px; }
+.challenge-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: var(--text-muted); font-size: 12px; }
+.challenge-card { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.challenge-card.selected { border-color: #7dd3fc; background: linear-gradient(145deg, #122c3d, var(--bg-secondary)); }
+.challenge-card h4 { margin: 4px 0; }
+.challenge-card .mission-meta { flex-wrap: wrap; gap: 8px; }
+.challenge-steps { list-style: none; margin: 4px 0; flex: 1; }
+.challenge-steps li { display: flex; gap: 9px; font-size: 12px; line-height: 1.7; color: var(--text-muted); padding: 7px 0; }
+.challenge-steps li > span:first-child { flex-shrink: 0; }
+.challenge-steps .done { color: #6ee7b7; }
+.challenge-tracker { padding: 14px 18px; border: 1px solid #38586d; border-radius: 10px; background: #142d38; display: flex; gap: 14px; align-items: center; justify-content: space-between; font-size: 12px; line-height: 1.7; }
+.challenge-tracker a { color: #7dd3fc; flex-shrink: 0; }
+#review-count { color: #7dd3fc; font-size: 12px; white-space: nowrap; margin-left: 6px; }
+.review-queue { list-style: none; margin: 16px 0; }
+.review-queue li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid var(--border-color); }
+.review-queue strong { display: block; font-size: 13px; line-height: 1.7; font-weight: 500; }
+.review-queue span { display: block; color: var(--text-muted); font-size: 11px; margin-top: 5px; }
+.review-queue button { flex-shrink: 0; }
+.badge-pin { margin-top: 12px; }
+.badge-pin[aria-pressed="true"] { border-color: #6ee7b7; color: #6ee7b7; }
+@media (max-width: 700px) {
+  .challenge-tracker { align-items: flex-start; flex-direction: column; }
+  .journey-showcase { padding: 18px; }
+}
