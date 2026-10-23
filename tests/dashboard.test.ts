@@ -16,7 +16,7 @@ import { runStreamWatermarkLab } from '../src/05-advanced-systems/stream-waterma
 // requests are disabled/mocked; only trusted repository scripts are evaluated.
 const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8')
   .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '').replace(/<link\b[^>]*>/g, '');
-const scripts = ['curriculum.js', 'app.js'].map(file => readFileSync(new URL(`../public/${file}`, import.meta.url), 'utf8')).join('\n');
+const scripts = ['curriculum.js', 'journey.js', 'app.js'].map(file => readFileSync(new URL(`../public/${file}`, import.meta.url), 'utf8')).join('\n');
 const windows: Window[] = [];
 const storageKey = 'backend-lab-learning-v1';
 function load(hash = '', stored?: string, blockStorage = false) {
@@ -32,7 +32,7 @@ function load(hash = '', stored?: string, blockStorage = false) {
   if (blockStorage) Object.defineProperty(win, 'localStorage', { get: () => { throw new Error('Storage blocked'); } });
   const fetch = vi.fn().mockRejectedValue(new Error('No response configured'));
   win.fetch = fetch;
-  win.eval(scripts);
+  win.eval(scripts + '\nwindow.testJourney = journey;');
   const el = (selector: string) => {
     const found = win.document.querySelector(selector);
     if (!found) throw new Error(`Missing element ${selector}`);
@@ -260,7 +260,7 @@ describe('Dashboard learning interactions', () => {
     expect(ui.win.document.querySelectorAll('.run-comparison tbody tr')).toHaveLength(6);
     expect(ui.win.document.querySelectorAll('.comparison-changed').length).toBeGreaterThanOrEqual(2);
     const stored = ui.win.localStorage.getItem(storageKey)!;
-    expect(Object.keys(JSON.parse(stored)).sort()).toEqual(['completed', 'lastTopic', 'path']);
+    expect(Object.keys(JSON.parse(stored)).sort()).toEqual(['completed', 'journey', 'lastTopic', 'path']);
     const resumed = load('#replication-quorums', stored);
     resumed.fetch.mockResolvedValue({ ok: true, json: async () => ({ data: runReplicationLab(), executionDurationMs: 1 }) });
     resumed.el('#run-btn').click();
@@ -334,5 +334,316 @@ describe('Dashboard learning interactions', () => {
     expect(ui.el('.run-comparison').querySelector('img, svg')).toBeNull();
     expect(ui.el('.run-comparison').textContent).toContain('<img');
     expect(ui.el('.run-comparison').textContent).toContain('Compare your runs');
+  });
+});
+
+describe('Learning journey', () => {
+  async function run(ui: ReturnType<typeof load>) {
+    ui.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ data: runConsensusLab(), executionDurationMs: 2 }) });
+    ui.el('#run-btn').click();
+    await vi.waitFor(() => expect(ui.el('#exec-status').textContent).toBe('Completed in 2ms'));
+  }
+  function saved(ui: ReturnType<typeof load>) {
+    return JSON.parse(ui.win.localStorage.getItem(storageKey)!);
+  }
+
+  it('opens a dedicated deep link, migrates old completions, and returns to the last topic', () => {
+    const ui = load('#journey', JSON.stringify({ completed: ['event-loop', 'event-loop', 'bad'], lastTopic: 'fencing-tokens' }));
+    expect(ui.win.location.hash).toBe('#journey');
+    expect(ui.el('#journey-view').hidden).toBe(false);
+    expect(ui.el('#experiment-view').hidden).toBe(true);
+    expect(ui.el('#journey-total-xp').textContent).toBe('50');
+    expect(ui.el('#journey-streak').textContent).toBe('0');
+    expect(ui.el('#journey-link').getAttribute('aria-current')).toBe('page');
+    ui.el('#journey-resume').click();
+    expect(ui.win.location.hash).toBe('#fencing-tokens');
+    expect(ui.el('#journey-view').hidden).toBe(true);
+    expect(ui.win.document.activeElement?.id).toBe('exp-title');
+  });
+
+  it('awards first-run XP once, tracks distinct daily labs, and reverses completion XP', async () => {
+    const ui = load('#consensus-quorum');
+    await run(ui);
+    expect(ui.el('#journey-total-xp').textContent).toBe('20');
+    await run(ui);
+    expect(ui.el('#journey-total-xp').textContent).toBe('20');
+    expect(ui.el('#daily-feedback').textContent).toBe('1 of 3 labs explored today');
+    expect(ui.el('#journey-streak').textContent).toBe('1');
+    ui.el('#mark-complete').click();
+    expect(ui.el('#journey-total-xp').textContent).toBe('70');
+    ui.el('#mark-complete').click();
+    expect(ui.el('#journey-total-xp').textContent).toBe('20');
+    ui.el('#mark-complete').click();
+    expect(ui.el('#journey-total-xp').textContent).toBe('70');
+    ui.change('#daily-goal', '1');
+    expect(ui.el('#daily-feedback').textContent).toContain('Goal reached!');
+    const resumed = load('#journey', ui.win.localStorage.getItem(storageKey)!);
+    expect(resumed.el('#journey-total-xp').textContent).toBe('70');
+    expect(resumed.el('#daily-goal').value).toBe('1');
+    expect(resumed.el('#daily-feedback').textContent).toContain('Goal reached!');
+    expect(saved(ui).journey.runs).toEqual(['consensus-quorum']);
+  });
+
+  it('does not reward failed or canceled requests, including leaving for the journey page', async () => {
+    const ui = load('#consensus-quorum');
+    ui.fetch.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Failed' }) });
+    ui.el('#run-btn').click();
+    await vi.waitFor(() => expect(ui.el('#exec-status').textContent).toBe('Error'));
+    expect(ui.el('#journey-total-xp').textContent).toBe('0');
+    let finish!: (value: unknown) => void;
+    ui.fetch.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    ui.el('#run-btn').click();
+    ui.win.location.hash = 'journey';
+    await vi.waitFor(() => expect(ui.el('#journey-view').hidden).toBe(false));
+    finish({ ok: true, json: async () => ({ data: runConsensusLab(), executionDurationMs: 2 }) });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(ui.el('#journey-total-xp').textContent).toBe('0');
+    expect(saved(ui).journey.runs).toEqual([]);
+    ui.win.location.hash = 'consensus-quorum';
+    await vi.waitFor(() => expect(ui.el('#journey-view').hidden).toBe(true));
+  });
+
+  it('launches the next unfinished path lab and clears conflicting filters', () => {
+    const ui = load('#journey', JSON.stringify({ completed: ['event-loop'] }));
+    ui.change('#topic-level', 'advanced');
+    ui.change('#topic-status', 'completed');
+    ui.change('#topic-search', 'absent');
+    ui.el('[data-quest="foundations"]').click();
+    expect(ui.win.location.hash).toBe('#data-structures');
+    expect(ui.el('#learning-path').value).toBe('foundations');
+    expect(ui.shown()).toContain('data-structures');
+    expect(ui.el('#journey-view').hidden).toBe(true);
+    expect(saved(ui).path).toBe('foundations');
+  });
+
+  it('shows achievement progress and honest empty filter states', () => {
+    const ui = load('#journey');
+    ui.el('[data-badge-filter="earned"]').click();
+    expect(ui.win.document.querySelectorAll('.journey-badge')).toHaveLength(0);
+    expect(ui.el('#badge-empty').hidden).toBe(false);
+    ui.el('#mark-complete').click();
+    expect(ui.win.document.querySelectorAll('.journey-badge')).toHaveLength(1);
+    expect(ui.el('#badge-empty').hidden).toBe(true);
+    expect(ui.el('#badge-count').textContent).toBe('1 / 10');
+    ui.el('[data-badge-filter="locked"]').click();
+    expect(ui.win.document.querySelectorAll('.journey-badge')).toHaveLength(9);
+    expect(ui.el('[data-badge-filter="locked"]').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('uses local calendar days for streak grace, gaps, month boundaries, and midnight refresh', () => {
+    const ui = load('#journey');
+    // Inject a clock only in this isolated DOM realm.
+    ui.win.eval(`
+      window.RealDate = Date;
+      window.clock = new RealDate(2026, 2, 1, 23, 59);
+      Date = class extends RealDate { constructor(...args) { super(...(args.length ? args : [clock])); } };
+      testJourney.state.days = { '2026-02-27': ['event-loop'], '2026-02-28': ['event-loop'] };
+      testJourney.render();
+    `);
+    expect(ui.el('#journey-streak').textContent).toBe('2');
+    expect(ui.el('#streak-description').textContent).toContain('still alive');
+    ui.win.eval("testJourney.recordRun('event-loop')");
+    expect(ui.el('#journey-streak').textContent).toBe('3');
+    ui.win.eval('clock = new RealDate(2026, 2, 2, 0, 1)');
+    ui.win.dispatchEvent(new ui.win.Event('focus'));
+    expect(ui.el('#daily-feedback').textContent).toBe('0 of 3 labs explored today');
+    expect(ui.el('#journey-streak').textContent).toBe('3');
+    ui.win.eval('clock = new RealDate(2026, 2, 3, 0, 1)');
+    ui.win.dispatchEvent(new ui.win.Event('focus'));
+    expect(ui.el('#journey-streak').textContent).toBe('0');
+  });
+
+  it('rejects malformed rewards and keeps working when persistence is blocked', async () => {
+    const ui = load('#journey', JSON.stringify({ journey: { goal: 999, runs: ['unknown', '__proto__', 'event-loop', 'event-loop'], days: { '2026-02-30': ['event-loop'], '2999-01-01': ['event-loop'], 'bad': ['event-loop'] } } }));
+    expect(ui.el('#journey-total-xp').textContent).toBe('20');
+    expect(ui.el('#daily-goal').value).toBe('3');
+    expect(saved(ui).journey.days).toEqual({});
+    const blocked = load('#consensus-quorum', undefined, true);
+    await run(blocked);
+    expect(blocked.el('#journey-total-xp').textContent).toBe('20');
+    expect(blocked.el('#journey-storage').textContent).toContain('only for this session');
+  });
+
+  it('handles all daily labs explored and offers them again on a new day without duplicate XP', () => {
+    const ui = load('#journey');
+    ui.win.eval(`
+      window.RealDate = Date;
+      window.clock = new RealDate(2026, 2, 8, 12);
+      Date = class extends RealDate { constructor(...args) { super(...(args.length ? args : [clock])); } };
+      Object.keys(testJourney.topics).forEach(key => testJourney.recordRun(key));
+    `);
+    expect(ui.el('#daily-next').disabled).toBe(true);
+    expect(ui.el('#journey-total-xp').textContent).toBe('920');
+    ui.win.eval('clock = new RealDate(2026, 2, 9, 12)');
+    ui.win.dispatchEvent(new ui.win.Event('focus'));
+    expect(ui.el('#daily-next').disabled).toBe(false);
+    ui.win.eval("testJourney.recordRun('event-loop')");
+    expect(ui.el('#journey-total-xp').textContent).toBe('920');
+    expect(ui.el('#daily-feedback').textContent).toBe('1 of 3 labs explored today');
+    expect(ui.el('#journey-streak').textContent).toBe('2');
+  });
+
+  it('keeps earned progress in session if a storage write exceeds quota', async () => {
+    const ui = load('#consensus-quorum');
+    Object.defineProperty(ui.win, 'localStorage', { value: {
+      setItem: () => { throw new Error('Quota exceeded'); },
+    } });
+    await run(ui);
+    expect(ui.el('#journey-total-xp').textContent).toBe('20');
+    expect(ui.el('#journey-storage').textContent).toContain('only for this session');
+  });
+
+  it('crosses level thresholds, completes path quests, and revisits a finished curriculum', () => {
+    const first = load();
+    const all = first.shown();
+    const ui = load('#journey', JSON.stringify({ completed: all, journey: { runs: all } }));
+    expect(ui.el('#journey-total-xp').textContent).toBe('3220');
+    expect(ui.el('#journey-level').textContent).toContain('Level 13');
+    expect(ui.el('#journey-level-progress').value).toBe(220);
+    expect(ui.el('#badge-count').textContent).toBe('8 / 10');
+    expect(ui.el('[data-quest="foundations"]').textContent).toBe('Revisit path →');
+    ui.el('[data-badge-filter="locked"]').click();
+    expect(ui.win.document.querySelectorAll('.journey-badge')).toHaveLength(2);
+    expect(ui.el('#badge-empty').hidden).toBe(true);
+    ui.el('[data-quest="foundations"]').click();
+    expect(ui.win.location.hash).toBe('#event-loop');
+  });
+});
+
+
+describe('Weekly missions, skill tracks, and personal records', () => {
+  function clock(ui: ReturnType<typeof load>, date: string) {
+    ui.win.eval(`
+      window.RealDate ||= Date;
+      window.clock = new RealDate('${date}T12:00:00');
+      Date = class extends RealDate { constructor(...args) { super(...(args.length ? args : [clock])); } };
+      testJourney.render();
+    `);
+  }
+
+  it('counts weekly variety once, claims only eligible rewards, and preserves them after reload and undo', () => {
+    const ui = load('#journey');
+    clock(ui, '2026-01-01');
+    ui.win.eval("testJourney.claimMission('explore'); testJourney.claimMission('__proto__')");
+    expect(ui.el('#journey-total-xp').textContent).toBe('0');
+    ui.win.eval("['event-loop', 'event-loop', 'data-structures', 'raw-tcp-udp', 'dns-resolution'].forEach(key => testJourney.recordRun(key))");
+    expect(ui.el('[data-mission="explore"]').textContent).toContain('Explore a lab');
+    expect(ui.el('#journey-total-xp').textContent).toBe('80');
+    ui.win.eval("testJourney.recordRun('protocols')");
+    const claim = ui.el('[data-mission="explore"]');
+    claim.focus();
+    claim.click();
+    claim.click(); // A stale button cannot claim twice either.
+    expect(ui.el('#journey-total-xp').textContent).toBe('160');
+    expect(ui.el('[data-mission="explore"]').disabled).toBe(true);
+    expect(ui.win.document.activeElement?.id).toBe('mission-feedback');
+    expect(ui.el('#mission-feedback').textContent).toContain('+60 XP claimed');
+    ui.el('#mark-complete').click();
+    ui.el('#mark-complete').click();
+    const resumed = load('#journey', ui.win.localStorage.getItem(storageKey)!);
+    expect(resumed.el('#journey-total-xp').textContent).toBe('160');
+    const state = JSON.parse(resumed.win.localStorage.getItem(storageKey)!);
+    expect(state.journey.claims).toEqual({ '2025-12-29': ['explore'] });
+    expect(resumed.el('#journey-badges').textContent).toContain('Mission accomplished');
+  });
+
+  it('separates local weeks across the year boundary and preserves claimed bonuses', () => {
+    const ui = load('#journey');
+    clock(ui, '2025-12-29');
+    ui.win.eval("testJourney.recordRun('event-loop')");
+    expect(ui.el('[data-mission="habit"]').disabled).toBe(true);
+    clock(ui, '2025-12-31');
+    ui.win.eval("testJourney.recordRun('event-loop')");
+    clock(ui, '2026-01-04'); // Sunday still belongs to December 29's week.
+    ui.win.eval("testJourney.recordRun('event-loop')");
+    expect(ui.el('[data-mission="habit"]').textContent).toContain('Claim +80 XP');
+    ui.el('[data-mission="habit"]').click();
+    expect(ui.el('#journey-total-xp').textContent).toBe('100');
+    clock(ui, '2026-01-05');
+    expect(ui.el('[data-mission="habit"]').textContent).toContain('Explore a lab');
+    expect(ui.el('[data-mission="habit"]').disabled).toBe(false);
+    expect(ui.el('#weekly-missions').textContent).toContain('0 / 3');
+    ui.win.eval("testJourney.claimMission('habit'); testJourney.recordRun('event-loop')");
+    expect(ui.el('#journey-total-xp').textContent).toBe('100');
+    expect(ui.el('[data-mission="habit"]').disabled).toBe(true);
+  });
+
+  it('requires all three difficulty levels for the range mission and suggests a missing level', () => {
+    const ui = load('#journey');
+    clock(ui, '2026-03-04');
+    ui.win.eval("testJourney.recordRun('event-loop'); testJourney.recordRun('worker-threads')");
+    ui.change('#topic-level', 'foundation');
+    ui.change('#topic-status', 'completed');
+    ui.change('#topic-search', 'absent');
+    ui.el('[data-mission="range"]').click();
+    expect(ui.win.location.hash).toBe('#consensus-quorum');
+    expect(ui.shown()).toHaveLength(46);
+    ui.win.eval("testJourney.recordRun('consensus-quorum')");
+    expect(ui.el('[data-mission="range"]').textContent).toContain('Claim +100 XP');
+    ui.el('[data-mission="range"]').click();
+    expect(ui.el('#journey-total-xp').textContent).toBe('160');
+  });
+
+  it('rejects malformed and unearned saved claims while deduplicating evidenced rewards', () => {
+    const days = { '2026-02-23': ['event-loop'], '2026-02-24': ['event-loop'], '2026-02-25': ['event-loop'] };
+    const ui = load('#journey', JSON.stringify({ journey: { days, range: 999, claims: {
+      '2026-02-23': ['habit', 'habit', 'range', 'explore', '__proto__'],
+      '2026-02-24': ['habit'], '2026-02-30': ['habit'], '2999-01-01': ['habit'], bad: ['habit'],
+      '2026-02-16': ['habit'], '2026-02-09': 'habit',
+    } } }));
+    const state = JSON.parse(ui.win.localStorage.getItem(storageKey)!);
+    expect(state.journey.claims).toEqual({ '2026-02-23': ['habit'] });
+    expect(ui.el('#journey-total-xp').textContent).toBe('80');
+    expect(ui.el('#activity-range').value).toBe('7');
+  });
+
+  it('shows 28 calendar days, distinct daily totals, and personal records that survive a broken streak', () => {
+    const ui = load('#journey', JSON.stringify({ journey: { days: {
+      '2026-02-26': ['event-loop'], '2026-02-27': ['event-loop', 'protocols', 'protocols'],
+      '2026-02-28': ['event-loop'], '2026-03-02': ['event-loop'],
+    } } }));
+    clock(ui, '2026-03-05');
+    ui.change('#activity-range', '28');
+    expect(ui.win.document.querySelectorAll('#journey-week li')).toHaveLength(28);
+    expect(ui.el('#journey-week').textContent).toContain('2026-02-27: 2 labs');
+    expect(ui.el('#record-streak').textContent).toBe('3 days');
+    expect(ui.el('#record-days').textContent).toBe('4');
+    expect(ui.el('#record-labs').textContent).toBe('2 labs');
+    expect(ui.el('#journey-streak').textContent).toBe('0');
+    expect(ui.el('#journey-badges').textContent).toContain('Steady practice');
+    const resumed = load('#journey', ui.win.localStorage.getItem(storageKey)!);
+    expect(resumed.el('#activity-range').value).toBe('28');
+    expect(resumed.win.document.querySelectorAll('#journey-week li')).toHaveLength(28);
+    expect(resumed.el('#record-streak').textContent).toBe('3 days');
+  });
+
+  it('keeps track progress honest, selects the next unfinished lab, and restores focus after refresh', () => {
+    const ui = load('#journey', JSON.stringify({ completed: ['event-loop'], journey: { runs: ['data-structures'] } }));
+    const track = ui.el('.skill-card');
+    expect(track.textContent).toContain('1 / 9 labs complete · 1 explored');
+    const button = ui.el('[data-skill-topic="data-structures"]');
+    button.focus();
+    ui.win.dispatchEvent(new ui.win.Event('focus'));
+    expect(ui.win.document.activeElement?.getAttribute('data-skill-topic')).toBe('data-structures');
+    ui.change('#learning-path', 'distributed');
+    ui.change('#topic-search', 'absent');
+    ui.el('[data-skill-topic="data-structures"]').click();
+    expect(ui.win.location.hash).toBe('#data-structures');
+    expect(ui.el('#learning-path').value).toBe('all');
+    expect(ui.shown()).toHaveLength(46);
+    expect(ui.win.document.activeElement?.id).toBe('exp-title');
+    ui.el('#mark-complete').click();
+    expect(ui.el('.skill-card').textContent).toContain('2 / 9 labs complete');
+    ui.el('#mark-complete').click();
+    expect(ui.el('.skill-card').textContent).toContain('1 / 9 labs complete');
+  });
+
+  it('keeps weekly claims usable in session when storage is blocked', () => {
+    const ui = load('#journey', undefined, true);
+    ui.win.eval("['event-loop', 'worker-threads', 'consensus-quorum'].forEach(key => testJourney.recordRun(key))");
+    ui.el('[data-mission="range"]').click();
+    ui.el('[data-mission="range"]').click();
+    expect(ui.el('#journey-total-xp').textContent).toBe('160');
+    expect(ui.el('#journey-storage').textContent).toContain('only for this session');
   });
 });

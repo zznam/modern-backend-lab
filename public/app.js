@@ -318,15 +318,50 @@ const searchInput = document.getElementById('topic-search');
 const completeBtn = document.getElementById('mark-complete');
 const nextBtn = document.getElementById('next-topic');
 
+const journey = new LearningJourney({
+  topics: EXPERIMENTS_CONFIG, paths: LEARNING_PATHS, stored: savedLearning.journey,
+  completed: completedTopics,
+  onChange: () => saveLearning(),
+  onTopic: key => {
+    pathSelect.value = levelSelect.value = statusSelect.value = 'all';
+    searchInput.value = '';
+    selectExperiment(key);
+    document.getElementById('exp-title').focus();
+  },
+  onPath: (id, key) => {
+    pathSelect.value = id;
+    levelSelect.value = statusSelect.value = 'all';
+    searchInput.value = '';
+    selectExperiment(key);
+    document.getElementById('exp-title').focus();
+  },
+});
+
+function showJourney(focus = true) {
+  resetRunDisplay();
+  document.getElementById('experiment-view').hidden = true;
+  document.getElementById('journey-view').hidden = false;
+  document.getElementById('journey-link').setAttribute('aria-current', 'page');
+  document.body.classList.add('show-journey');
+  document.title = 'Your learning journey | Backend Lab';
+  journey.render();
+  if (focus) document.getElementById('journey-title').focus();
+}
+document.getElementById('journey-resume').addEventListener('click', () => {
+  selectExperiment(currentExpKey);
+  document.getElementById('exp-title').focus();
+});
+
 function pathTopics() {
   return LEARNING_PATHS[pathSelect.value]?.topics || navItems.map(item => item.dataset.exp);
 }
 
 function saveLearning() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: [...completedTopics], lastTopic: currentExpKey, path: pathSelect.value }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ completed: [...completedTopics], lastTopic: currentExpKey, path: pathSelect.value, journey: journey.state }));
   } catch {
     document.querySelector('.local-note').textContent = 'Session only';
+    document.getElementById('journey-storage').textContent = 'Storage unavailable. Progress lasts only for this session.';
   }
 }
 
@@ -368,6 +403,7 @@ function updateCurriculum() {
   nextBtn.disabled = !next;
   nextBtn.textContent = next ? 'Next topic →' : 'Path finished';
   nextBtn.dataset.next = next || '';
+  journey.render();
 }
 
 [pathSelect, levelSelect, statusSelect].forEach(select => select.addEventListener('change', () => {
@@ -404,7 +440,9 @@ function hashTopic() {
 }
 window.addEventListener('hashchange', () => {
   const key = hashTopic();
-  if (navItems.some(item => item.dataset.exp === key) && key !== currentExpKey) selectExperiment(key);
+  if (key === 'journey') showJourney();
+  else if (navItems.some(item => item.dataset.exp === key) && (key !== currentExpKey || !document.getElementById('journey-view').hidden)) selectExperiment(key);
+  else if (!key) selectExperiment(currentExpKey);
 });
 
 // Tab Switching
@@ -449,9 +487,13 @@ document.querySelectorAll('.nav-item').forEach((item) => {
   });
 });
 
-function selectExperiment(key) {
+function selectExperiment(key, updateHash = true) {
   if (!navItems.some(item => item.dataset.exp === key)) return;
   resetRunDisplay();
+  document.getElementById('experiment-view').hidden = false;
+  document.getElementById('journey-view').hidden = true;
+  document.getElementById('journey-link').removeAttribute('aria-current');
+  document.body.classList.remove('show-journey');
   document.querySelectorAll('.nav-item').forEach(item => {
     const selected = item.dataset.exp === key;
     item.classList.toggle('active', selected);
@@ -459,7 +501,7 @@ function selectExperiment(key) {
   });
   currentExpKey = key;
   const cfg = EXPERIMENTS_CONFIG[key];
-  if (hashTopic() !== key) location.hash = key;
+  if (updateHash && hashTopic() !== key) location.hash = key;
   document.title = `${cfg.title} | Backend Lab`;
 
   expCategoryEl.textContent = cfg.category;
@@ -595,6 +637,7 @@ runBtn.addEventListener('click', async () => {
       stageViewport.querySelector('.result-summary').after(comparison);
       previousRuns.set(key, snapshot);
     }
+    journey.recordRun(key);
   } catch (err) {
     if (version !== selectionVersion || activeRun !== run) return;
     metricsGrid.innerHTML = '';
@@ -838,4 +881,9 @@ pathSelect.value = Object.hasOwn(LEARNING_PATHS, savedLearning.path) ? savedLear
 const linkedTopic = hashTopic();
 const initialTopic = navItems.some(item => item.dataset.exp === linkedTopic) ? linkedTopic
   : navItems.some(item => item.dataset.exp === savedLearning.lastTopic) ? savedLearning.lastTopic : 'event-loop';
-selectExperiment(initialTopic);
+selectExperiment(initialTopic, linkedTopic !== 'journey');
+if (linkedTopic === 'journey') showJourney(false);
+// Refresh date-based quests after returning to a tab or crossing midnight.
+window.addEventListener('focus', () => journey.render());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) journey.render(); });
+setInterval(() => { if (!document.hidden) journey.render(); }, 60000);
