@@ -16,7 +16,7 @@ import { runStreamWatermarkLab } from '../src/05-advanced-systems/stream-waterma
 // requests are disabled/mocked; only trusted repository scripts are evaluated.
 const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8')
   .replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '').replace(/<link\b[^>]*>/g, '');
-const scripts = ['curriculum.js', 'journey.js', 'app.js'].map(file => readFileSync(new URL(`../public/${file}`, import.meta.url), 'utf8')).join('\n');
+const scripts = ['curriculum.js', 'quest-catalog.js', 'quest-engine.js', 'quest-ui.js', 'journey.js', 'app.js'].map(file => readFileSync(new URL(`../public/${file}`, import.meta.url), 'utf8')).join('\n');
 const windows: Window[] = [];
 const storageKey = 'backend-lab-learning-v1';
 function load(hash = '', stored?: string, blockStorage = false) {
@@ -32,7 +32,7 @@ function load(hash = '', stored?: string, blockStorage = false) {
   if (blockStorage) Object.defineProperty(win, 'localStorage', { get: () => { throw new Error('Storage blocked'); } });
   const fetch = vi.fn().mockRejectedValue(new Error('No response configured'));
   win.fetch = fetch;
-  win.eval(scripts + '\nwindow.testJourney = journey;');
+  win.eval(scripts + '\nwindow.testJourney = journey; window.testQuests = questEngine; window.testQuestHub = questHub;');
   const el = (selector: string) => {
     const found = win.document.querySelector(selector);
     if (!found) throw new Error(`Missing element ${selector}`);
@@ -260,7 +260,7 @@ describe('Dashboard learning interactions', () => {
     expect(ui.win.document.querySelectorAll('.run-comparison tbody tr')).toHaveLength(6);
     expect(ui.win.document.querySelectorAll('.comparison-changed').length).toBeGreaterThanOrEqual(2);
     const stored = ui.win.localStorage.getItem(storageKey)!;
-    expect(Object.keys(JSON.parse(stored)).sort()).toEqual(['completed', 'journey', 'lastTopic', 'path']);
+    expect(Object.keys(JSON.parse(stored)).sort()).toEqual(['completed', 'journey', 'lastTopic', 'path', 'quests']);
     const resumed = load('#replication-quorums', stored);
     resumed.fetch.mockResolvedValue({ ok: true, json: async () => ({ data: runReplicationLab(), executionDurationMs: 1 }) });
     resumed.el('#run-btn').click();

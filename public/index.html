@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Modern Backend Engineering Mastery Lab</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="quest.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -212,7 +213,8 @@
           </section>
           <aside class="journey-showcase" aria-label="Achievement showcase"><span id="showcase-icon" class="badge-icon" aria-hidden="true">◇</span><div><span class="eyebrow">Your showcase</span><h3 id="showcase-title"></h3><p id="showcase-description"></p></div></aside>
           <p id="showcase-feedback" class="journey-feedback" role="status" aria-live="polite" tabindex="-1"></p>
-          <nav class="journey-jumps" aria-label="Journey sections"><button class="secondary-btn" data-journey-section="challenge-title">Scenario challenges</button><button class="secondary-btn" data-journey-section="review-title">Practice review</button><button class="secondary-btn" data-journey-section="weekly-title">Weekly missions</button><button class="secondary-btn" data-journey-section="badges-title">Achievements</button></nav>
+          <nav class="journey-jumps" aria-label="Journey sections"><button class="secondary-btn" data-journey-section="quest-hub-title">Quest hub</button><button class="secondary-btn" data-journey-section="challenge-title">Scenario challenges</button><button class="secondary-btn" data-journey-section="review-title">Practice review</button><button class="secondary-btn" data-journey-section="weekly-title">Weekly missions</button><button class="secondary-btn" data-journey-section="badges-title">Achievements</button></nav>
+          <section id="quest-hub" class="journey-section" aria-label="Quest hub"></section>
           <div class="journey-columns">
             <section class="journey-card" aria-labelledby="daily-title">
               <span class="eyebrow">Make time for discovery</span><h3 id="daily-title">Today’s quest</h3>
@@ -244,10 +246,11 @@
           </section>
           <section class="journey-section" aria-labelledby="quests-title"><div class="journey-section-heading"><div><span class="eyebrow">Choose your next challenge</span><h3 id="quests-title">Path quests</h3></div><span>Complete labs to finish a quest</span></div><div id="journey-quests" class="journey-quest-grid"></div></section>
           <section class="journey-section" aria-labelledby="badges-title"><div class="journey-section-heading"><div><span class="eyebrow">Milestones that matter</span><h3 id="badges-title" tabindex="-1">Achievement collection <span id="badge-count"></span></h3></div><div id="badge-filters" class="badge-filters" role="group" aria-label="Filter achievements"><button class="secondary-btn" data-badge-filter="all" aria-pressed="true">All</button><button class="secondary-btn" data-badge-filter="earned" aria-pressed="false">Earned</button><button class="secondary-btn" data-badge-filter="locked" aria-pressed="false">Locked</button></div></div><div id="journey-badges" class="journey-badge-grid"></div><p id="badge-empty" hidden>No achievements here yet. Try a lab to get started.</p></section>
-          <footer class="journey-fine"><p><strong>How XP works:</strong> +20 for the first successful run of each lab, +50 for each lab marked complete. Undoing completion removes its 50 XP. Every 250 XP earns a level. Weekly missions award an extra 60, 80, or 100 XP when claimed, once per mission per week. Each scenario challenge awards 120 XP once after you accept it, run all three labs, and claim the reward. Claimed bonuses stay earned. Repeated runs support your daily goal but never duplicate first-run XP.</p><p id="journey-storage">Saved only in this browser. No account or leaderboard. Existing completed labs count toward XP; earlier runs and dates cannot be reconstructed.</p></footer>
+          <footer class="journey-fine"><p><strong>How XP works:</strong> +20 for the first successful run of each lab, +50 for each lab marked complete. Undoing completion removes its 50 XP. Every 250 XP earns a level. Weekly missions award an extra 60, 80, or 100 XP when claimed, once per mission per week. Each scenario challenge awards 120 XP once after you accept it, run all three labs, and claim the reward. Claimed bonuses stay earned. Repeated runs support your daily goal but never duplicate first-run XP. Quest hub adds first-correct knowledge rewards, opt-in daily featured bonuses, daily focus sprints, and claimed campaign or milestone rewards. See its Progress tab for your XP breakdown.</p><p id="journey-storage">Saved only in this browser. No account or leaderboard. Existing completed labs count toward XP; earlier runs and dates cannot be reconstructed.</p></footer>
         </section>
         <section id="experiment-view" aria-label="Current experiment">
         <aside id="challenge-tracker" class="challenge-tracker" hidden><span id="challenge-tracker-text" role="status" aria-live="polite"></span><a href="#journey">View challenge →</a></aside>
+        <aside id="quest-run-tracker" class="challenge-tracker" aria-label="Active quests" hidden><span id="quest-run-status" role="status" aria-live="polite"></span><a href="#journey">View quest hub →</a></aside>
         <div class="experiment-header">
           <div class="title-cluster">
             <div class="topic-badges"><span class="badge" id="exp-category">Pillar 1: Runtime</span><span class="level-badge" id="exp-level">Foundation</span></div>
@@ -267,6 +270,12 @@
           <div><span class="eyebrow">Your objective</span><p id="learning-objective"></p><div id="prerequisites" class="prerequisites"></div></div>
           <div class="learning-actions"><button id="mark-complete" class="secondary-btn" aria-pressed="false">Mark complete</button><button id="next-topic" class="text-btn">Next topic →</button><button id="copy-link" class="text-btn">Copy topic link</button><span id="link-feedback" role="status" aria-live="polite"></span></div>
         </section>
+        <div class="learning-actions quest-lab-tools" role="group" aria-label="Practice tools">
+          <button id="quest-lab-favorite" class="secondary-btn" aria-pressed="false">☆ Favorite lab</button>
+          <button id="quest-lab-queue" class="secondary-btn" aria-pressed="false">Add to practice queue</button>
+          <button id="quest-lab-reflect" class="text-btn">Confidence &amp; reflection →</button>
+          <span id="quest-lab-feedback" role="status" aria-live="polite"></span>
+        </div>
 
         <!-- Custom Parameters Bar (dynamic) -->
         <div class="controls-card" id="controls-container">
@@ -322,6 +331,9 @@
   </div>
 
   <script src="curriculum.js"></script>
+  <script src="quest-catalog.js"></script>
+  <script src="quest-engine.js"></script>
+  <script src="quest-ui.js"></script>
   <script src="journey.js"></script>
   <script src="app.js"></script>
 </body>

@@ -175,6 +175,7 @@ class LearningJourney {
       const progress = this.state.challenges[challenge.id];
       if (!progress.claimed && !progress.steps.includes(key)) progress.steps.push(key);
     }
+    this.quest?.recordRun(key);
     this.render();
     this.onChange();
   }
@@ -332,7 +333,7 @@ class LearningJourney {
     };
     const html = (id, value) => { document.getElementById(id).innerHTML = value; };
     const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-    const xp = this.state.runs.length * 20 + this.completed.size * 50 + this.bonusXP();
+    const xp = this.state.runs.length * 20 + this.completed.size * 50 + this.bonusXP() + (this.quest?.xp() || 0);
     const level = Math.floor(xp / 250) + 1;
     text('journey-xp', `${xp} XP`);
     text('journey-total-xp', xp);
@@ -410,6 +411,7 @@ class LearningJourney {
       return `<article class="journey-badge ${earned ? 'earned' : ''}"><span class="badge-icon" aria-hidden="true">${badge.icon}</span><div><span class="badge-state">${earned ? 'Earned' : 'Locked'} · ${Math.min(badge.value, badge.max)} / ${badge.max}</span><h4>${badge.title}</h4><p>${badge.description}</p>${earned ? `<button class="secondary-btn badge-pin" data-pin-badge="${badge.id}" aria-pressed="${this.state.pinnedBadge === badge.id}" aria-label="Showcase ${badge.title}">${this.state.pinnedBadge === badge.id ? '✓ Showcased' : 'Showcase badge'}</button>` : ''}</div></article>`;
     }).join(''));
     this.renderExtras({ text, html, escape });
+    this.onQuestRender?.();
     // Periodic renders preserve keyboard position; claiming moves focus to its live confirmation.
     if (focusAttribute) {
       const target = [...document.querySelectorAll(`[${focusAttribute}]`)].find(element => element.getAttribute(focusAttribute) === focusValue);
