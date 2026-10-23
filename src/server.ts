@@ -655,3 +655,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
 }
 
 export { app, server };
+export default app;
