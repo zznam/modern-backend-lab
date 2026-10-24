@@ -135,7 +135,7 @@ export async function runMemoryLeakExperiment(): Promise<{
       heapGrowthMb: Math.round((afterLeaks.heapUsedMb - baseline.heapUsedMb) * 100) / 100,
       retainedObjects: 'Simulated 3,000 un-evicted cache keys, 1,500 dangling closures, and 1,000 chained scope objects.',
       v8HeapExplanation:
-        'V8 organizes heap into New Space (Semi-space From & To for Young objects via Cheney Scavenge) and Old Space (Mark-Sweep & Mark-Compact for survived Long-lived objects). Leaked objects survive scavenge cycles and get promoted to Old Space, causing steadily increasing RSS and eventually OOM crashes.',
+        'V8 organizes heap into New Space / Young Generation (collected via parallel MinorMC / Cheney-style scavenging) and Old Space (collected via Orinoco concurrent marking, parallel sweeping, and compacting). Leaked objects survive young generation cycles and get promoted to Old Space, causing steadily increasing RSS and eventually OOM crashes.',
     },
   };
 }

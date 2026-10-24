@@ -58,6 +58,21 @@ export class SlidingWindowRateLimiter {
     this.maxRequests = maxRequests;
   }
 
+  public cleanupStale(now = Date.now()): number {
+    const windowStart = now - this.windowSizeMs;
+    let evicted = 0;
+    for (const [id, timestamps] of this.requestTimestamps.entries()) {
+      const active = timestamps.filter((t) => t > windowStart);
+      if (active.length === 0) {
+        this.requestTimestamps.delete(id);
+        evicted++;
+      } else if (active.length !== timestamps.length) {
+        this.requestTimestamps.set(id, active);
+      }
+    }
+    return evicted;
+  }
+
   public allowRequest(clientId: string): {
     allowed: boolean;
     currentCount: number;
@@ -66,6 +81,11 @@ export class SlidingWindowRateLimiter {
   } {
     const now = Date.now();
     const windowStart = now - this.windowSizeMs;
+
+    // Opportunistically prune stale clients if map becomes large
+    if (this.requestTimestamps.size > 500) {
+      this.cleanupStale(now);
+    }
 
     let timestamps = this.requestTimestamps.get(clientId) || [];
 

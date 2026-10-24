@@ -35,8 +35,8 @@ const EXPERIMENTS_CONFIG = {
     desc: 'Demonstrates how CPU-bound tasks block the main thread event loop (causing massive lag) vs offloading to Worker Threads to keep the server 100% responsive.',
     controlsHtml: `
       <div class="control-group">
-        <label>Prime Search Limit:</label>
-        <input type="number" id="param-limit" class="control-input" value="30000" min="5000" max="80000" step="5000">
+        <label for="param-limit">Prime Search Limit (5,000 – 80,000):</label>
+        <input required type="number" id="param-limit" class="control-input" value="30000" min="5000" max="80000" step="5000">
       </div>
     `,
     getParams: () => ({ limit: parseInt(document.getElementById('param-limit').value, 10) }),
@@ -61,8 +61,8 @@ const EXPERIMENTS_CONFIG = {
     architecture: `
       <h4>V8 Heap Anatomy</h4>
       <ul>
-        <li><strong>New Space (Young Generation):</strong> Eden + Semi-spaces (From/To). Short-lived objects are allocated here and collected via Cheney's Scavenge algorithm.</li>
-        <li><strong>Old Pointer / Old Data Space:</strong> Objects that survive two scavenge cycles are promoted to Old Space. Collected via Mark-Sweep and Mark-Compact.</li>
+        <li><strong>New Space (Young Generation):</strong> Short-lived objects are allocated here and collected via MinorMC / Cheney-style scavenging. Surviving objects get promoted to Old Space.</li>
+        <li><strong>Old Pointer / Old Data Space:</strong> Objects that survive young generation cycles are promoted to Old Space. Collected via Orinoco concurrent marking, parallel sweeping, and compacting.</li>
         <li><strong>Large Object Space:</strong> Allocations exceeding ~1MB bypass New Space directly to avoid expensive copy operations.</li>
       </ul>
     `,
@@ -81,8 +81,8 @@ const EXPERIMENTS_CONFIG = {
     desc: 'Simulates 30 simultaneous bank withdrawals or ticket purchases to expose the Lost Update anomaly and compare Pessimistic (SELECT FOR UPDATE) vs Optimistic locking.',
     controlsHtml: `
       <div class="control-group">
-        <label>Concurrent Requests:</label>
-        <input type="number" id="param-concurrency" class="control-input" value="30" min="10" max="100" step="10">
+        <label for="param-concurrency">Concurrent Requests (10 – 100):</label>
+        <input required type="number" id="param-concurrency" class="control-input" value="30" min="10" max="100" step="10">
       </div>
     `,
     getParams: () => ({ concurrency: parseInt(document.getElementById('param-concurrency').value, 10) }),
@@ -126,8 +126,8 @@ const EXPERIMENTS_CONFIG = {
     desc: 'Compare simultaneous database hits when a hot cache key expires with a single shared query using Singleflight locking. Choose the number of concurrent requests below.',
     controlsHtml: `
       <div class="control-group">
-        <label>Concurrent Requests:</label>
-        <input type="number" id="param-stampede-concurrency" class="control-input" value="50" min="10" max="100" step="10">
+        <label for="param-stampede-concurrency">Concurrent Requests (10 – 100):</label>
+        <input required type="number" id="param-stampede-concurrency" class="control-input" value="50" min="10" max="100" step="10">
       </div>
     `,
     getParams: () => ({ concurrency: parseInt(document.getElementById('param-stampede-concurrency').value, 10) }),
@@ -169,8 +169,8 @@ const EXPERIMENTS_CONFIG = {
     desc: 'Demonstrates why modulo hashing (hash % N) reshuffles ~80% of all cache keys when adding a server, while Consistent Hashing relocates only ~20% of keys.',
     controlsHtml: `
       <div class="control-group">
-        <label>Total Keys:</label>
-        <input type="number" id="param-hash-keys" class="control-input" value="1000" min="100" max="5000" step="100">
+        <label for="param-hash-keys">Total Keys (100 – 5,000):</label>
+        <input required type="number" id="param-hash-keys" class="control-input" value="1000" min="100" max="5000" step="100">
       </div>
     `,
     getParams: () => ({ keyCount: parseInt(document.getElementById('param-hash-keys').value, 10) }),
@@ -233,12 +233,12 @@ const EXPERIMENTS_CONFIG = {
     desc: 'Executes an automated load test measuring Throughput (Requests Per Second) and Latency percentiles (min, avg, p95, p99) under high concurrency.',
     controlsHtml: `
       <div class="control-group">
-        <label>Total Requests:</label>
-        <input type="number" id="param-stress-reqs" class="control-input" value="1000" min="200" max="5000" step="200">
+        <label for="param-stress-reqs">Total Requests (200 – 5,000):</label>
+        <input required type="number" id="param-stress-reqs" class="control-input" value="1000" min="200" max="5000" step="200">
       </div>
       <div class="control-group">
-        <label>Concurrency:</label>
-        <input type="number" id="param-stress-concurrency" class="control-input" value="50" min="10" max="100" step="10">
+        <label for="param-stress-concurrency">Concurrency (10 – 100):</label>
+        <input required type="number" id="param-stress-concurrency" class="control-input" value="50" min="10" max="100" step="10">
       </div>
     `,
     getParams: () => ({
@@ -396,6 +396,7 @@ function showJourney(focus = true) {
   document.getElementById('journey-link').setAttribute('aria-current', 'page');
   document.body.classList.add('show-journey');
   document.title = 'Your learning journey | Backend Lab';
+  document.getElementById('main-content').scrollTop = 0;
   journey.render();
   if (focus) document.getElementById('journey-title').focus();
 }
@@ -417,7 +418,7 @@ function saveLearning() {
   }
 }
 
-function updateCurriculum() {
+function updateCurriculum(renderJourney = true) {
   const topics = pathTopics();
   const done = topics.filter(key => completedTopics.has(key)).length;
   const progress = document.getElementById('learning-progress');
@@ -455,13 +456,13 @@ function updateCurriculum() {
   nextBtn.disabled = !next;
   nextBtn.textContent = next ? 'Next topic →' : 'Path finished';
   nextBtn.dataset.next = next || '';
-  journey.render();
+  if (renderJourney) journey.render();
 }
 
 [pathSelect, levelSelect, statusSelect].forEach(select => select.addEventListener('change', () => {
   updateCurriculum(); saveLearning();
 }));
-searchInput.addEventListener('input', updateCurriculum);
+searchInput.addEventListener('input', () => updateCurriculum(false));
 document.getElementById('clear-filters').addEventListener('click', () => {
   searchInput.value = '';
   pathSelect.value = levelSelect.value = statusSelect.value = 'all';
@@ -492,9 +493,40 @@ function hashTopic() {
 }
 window.addEventListener('hashchange', () => {
   const key = hashTopic();
-  if (key === 'journey') showJourney();
+  if (key === 'journey') {
+    if (document.getElementById('journey-view').hidden) showJourney();
+  }
   else if (navItems.some(item => item.dataset.exp === key) && (key !== currentExpKey || !document.getElementById('journey-view').hidden)) selectExperiment(key);
   else if (!key) selectExperiment(currentExpKey);
+});
+
+// Global keyboard shortcuts: / or Cmd/Ctrl+K to focus search, Esc to clear
+window.addEventListener('keydown', (e) => {
+  if ((e.key === '/' || ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K'))) && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+    e.preventDefault();
+    searchInput.focus();
+    searchInput.select();
+  } else if (e.key === 'Escape' && document.activeElement === searchInput) {
+    if (searchInput.value) {
+      searchInput.value = '';
+      updateCurriculum(false);
+      saveLearning();
+    }
+    searchInput.blur();
+  }
+});
+
+// Copy JSON Payload
+document.getElementById('copy-json-btn')?.addEventListener('click', async () => {
+  const code = jsonOutput.textContent || '';
+  const feedback = document.getElementById('copy-json-feedback');
+  try {
+    await navigator.clipboard.writeText(code);
+    if (feedback) feedback.textContent = 'JSON copied!';
+    setTimeout(() => { if (feedback) feedback.textContent = ''; }, 2500);
+  } catch {
+    if (feedback) feedback.textContent = 'Copy failed';
+  }
 });
 
 // Tab Switching
@@ -546,6 +578,7 @@ function selectExperiment(key, updateHash = true) {
   document.getElementById('journey-view').hidden = true;
   document.getElementById('journey-link').removeAttribute('aria-current');
   document.body.classList.remove('show-journey');
+  document.getElementById('main-content').scrollTop = 0;
   document.querySelectorAll('.nav-item').forEach(item => {
     const selected = item.dataset.exp === key;
     item.classList.toggle('active', selected);
@@ -567,6 +600,12 @@ function selectExperiment(key, updateHash = true) {
   document.getElementById('link-feedback').textContent = '';
   document.getElementById('quest-lab-feedback').textContent = '';
   controlsContainer.innerHTML = cfg.controlsHtml || '<span style="color:var(--text-dim);font-size:13px;">No custom parameters required for this experiment.</span>';
+  if (cfg.controlsHtml) {
+    controlsContainer.insertAdjacentHTML('beforeend', '<button type="button" class="reset-params-btn" id="reset-params-btn" title="Reset parameters to initial defaults">Reset parameters</button>');
+    document.getElementById('reset-params-btn')?.addEventListener('click', () => {
+      selectExperiment(key, false);
+    });
+  }
   controlsContainer.querySelectorAll('.control-group').forEach(group => {
     const input = group.querySelector('input, select');
     const label = group.querySelector('label');
@@ -783,7 +822,7 @@ function renderVisualStage(key, data, durationMs) {
       `;
 
       stageViewport.innerHTML = `
-        <div style="width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+        <div class="grid-responsive-3">
           <div class="flow-step" style="flex-direction:column;align-items:flex-start;">
             <span class="badge" style="background:rgba(239,68,68,0.2);color:#f87171;">No Lock</span>
             <p style="font-size:13px;margin:8px 0;color:var(--text-muted);">${data.noLock?.verdict}</p>
@@ -891,7 +930,7 @@ function renderVisualStage(key, data, durationMs) {
       `;
 
       stageViewport.innerHTML = `
-        <div style="width:100%;display:grid;grid-template-columns:repeat(5, 1fr);gap:12px;text-align:center;">
+        <div class="grid-responsive-5">
           <div class="flow-step" style="flex-direction:column;"><span class="metric-label">Min</span><strong>${data.latencyMs?.min} ms</strong></div>
           <div class="flow-step" style="flex-direction:column;"><span class="metric-label">Average</span><strong>${data.latencyMs?.avg} ms</strong></div>
           <div class="flow-step" style="flex-direction:column;"><span class="metric-label">p95</span><strong>${data.latencyMs?.p95} ms</strong></div>
@@ -903,27 +942,90 @@ function renderVisualStage(key, data, durationMs) {
     }
 
     default: {
-      metricsGrid.innerHTML = `
+      const cards = [];
+      cards.push(`
         <div class="metric-card">
           <div class="metric-label">Execution Time</div>
           <div class="metric-value">${durationMs} ms</div>
           <div class="metric-sub">Completed successfully</div>
         </div>
-        <div class="metric-card">
-          <div class="metric-label">Status</div>
-          <div class="metric-value" style="color:var(--accent-green);">200 OK</div>
-          <div class="metric-sub">Payload rendered below</div>
-        </div>
-      `;
+      `);
 
-      stageViewport.innerHTML = `
-        <div style="width:100%;padding:16px;background:var(--bg-primary);border-radius:6px;border:1px solid var(--border-color);">
-          <div style="font-size:14px;color:var(--text-main);margin-bottom:8px;font-weight:600;">Execution Summary:</div>
-          <p style="font-size:13px;color:var(--text-muted);line-height:1.6;">
-            Experiment <code>${key}</code> executed in ${durationMs}ms. Check the "JSON Result Payload" tab below to explore the detailed structured response.
-          </p>
+      // Detect prominent top-level properties or analysis for metric cards
+      if (typeof data === 'object' && data !== null) {
+        for (const [keyName, val] of Object.entries(data)) {
+          if (cards.length >= 4) break;
+          if (typeof val === 'number') {
+            cards.push(`
+              <div class="metric-card">
+                <div class="metric-label">${escapeHtml(keyName.replace(/([A-Z])/g, ' $1').trim())}</div>
+                <div class="metric-value">${val}</div>
+                <div class="metric-sub">Metric value</div>
+              </div>
+            `);
+          } else if (typeof val === 'string' && val.length > 0 && val.length < 30) {
+            cards.push(`
+              <div class="metric-card">
+                <div class="metric-label">${escapeHtml(keyName.replace(/([A-Z])/g, ' $1').trim())}</div>
+                <div class="metric-value" style="font-size:16px;">${escapeHtml(val)}</div>
+                <div class="metric-sub">Property</div>
+              </div>
+            `);
+          } else if (Array.isArray(val)) {
+            cards.push(`
+              <div class="metric-card">
+                <div class="metric-label">${escapeHtml(keyName.replace(/([A-Z])/g, ' $1').trim())}</div>
+                <div class="metric-value">${val.length} items</div>
+                <div class="metric-sub">Array count</div>
+              </div>
+            `);
+          }
+        }
+      }
+
+      if (cards.length === 1) {
+        cards.push(`
+          <div class="metric-card">
+            <div class="metric-label">Status</div>
+            <div class="metric-value" style="color:var(--accent-green);">200 OK</div>
+            <div class="metric-sub">Payload rendered below</div>
+          </div>
+        `);
+      }
+      metricsGrid.innerHTML = cards.join('');
+
+      // Build structured summary in stageViewport
+      let summaryText = '';
+      if (data && typeof data === 'object') {
+        if (typeof data.summary === 'string') summaryText = data.summary;
+        else if (typeof data.explanation === 'string') summaryText = data.explanation;
+        else if (typeof data.verdict === 'string') summaryText = data.verdict;
+        else if (data.analysis && typeof data.analysis === 'object') {
+          summaryText = Object.entries(data.analysis).map(([k, v]) => `<strong>${escapeHtml(k)}:</strong> ${escapeHtml(String(v))}`).join('<br>');
+        }
+      }
+
+      let contentHtml = `
+        <div class="default-stage-box">
+          <div class="stage-summary-header">
+            <h4>Experiment Execution Overview</h4>
+            <span class="badge" style="background:rgba(16,185,129,0.2);color:var(--accent-green);">Success (${durationMs}ms)</span>
+          </div>
+          ${summaryText ? `<div class="stage-summary-text">${summaryText}</div>` : ''}
+          <div class="stage-payload-preview">
+            <p class="journey-fine" style="margin-bottom:10px;">Structured data returned from backend runtime. Full raw JSON is available in the <em>JSON Result Payload</em> tab.</p>
+            <div class="data-preview-grid">
+              ${Object.entries(data || {}).map(([k, v]) => `
+                <div class="data-preview-item">
+                  <span class="data-key">${escapeHtml(k)}</span>
+                  <span class="data-val">${escapeHtml(typeof v === 'object' && v !== null ? (Array.isArray(v) ? `[Array: ${v.length} items]` : '{Object: ' + Object.keys(v).join(', ') + '}') : String(v))}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
         </div>
       `;
+      stageViewport.innerHTML = contentHtml;
       break;
     }
   }

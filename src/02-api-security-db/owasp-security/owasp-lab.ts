@@ -156,7 +156,7 @@ export class OwaspSecurityLab {
       verifyCorrect,
       verifyWrong,
       whyNotSha256:
-        'Standard SHA-256 is designed for fast hardware throughput (billions of hashes/sec on GPUs), making it vulnerable to rainbow tables. Password hashing MUST use slow, memory-hard algorithms with work factors (bcrypt, Argon2id, PBKDF2).',
+        'Standard SHA-256 is designed for fast hardware throughput (billions of hashes/sec on GPUs), making it vulnerable to rainbow tables. Modern standards (OWASP, NIST SP 800-63B) mandate memory-hard functions: Argon2id is the primary recommendation, with bcrypt (cost >= 10, mindful of its 72-byte truncation boundary) and PBKDF2 as established alternatives.',
     };
   }
 

@@ -35,7 +35,7 @@ export function getConcurrencyModelMatrix(): ConcurrencyModelComparison[] {
     },
     {
       model: 'Green Threads / Goroutines / Fibers',
-      memoryPerUnit: '2 KB (Dynamic segmented stack that grows on demand)',
+      memoryPerUnit: '2 KB (Contiguous dynamic stack that grows/shrinks on demand; copied to new contiguous allocation)',
       creationTimeUs: 2,
       contextSwitchCost: 'Ultra Cheap (~10 - 50 ns). Userspace context switch saves only ~14 CPU registers, zero kernel traps.',
       scheduler: 'Userspace M:N Runtime Scheduler (Go runtime, Erlang BEAM, Java Virtual Threads)',
@@ -99,6 +99,15 @@ export function getIoMultiplexingEvolution(): MultiplexingEvolution[] {
       triggerMode: 'Edge-Triggered and Level-Triggered (Supports Sockets, Files, Signals, Timers)',
       supportedOS: 'macOS, FreeBSD, OpenBSD (Powers macOS Node.js libuv, Nginx on BSD)',
       verdict: 'More expressive and versatile than epoll, natively handles file system vnodes & signals',
+    },
+    {
+      mechanism: 'io_uring (io_uring_setup, io_uring_enter, io_uring_register)',
+      complexity: 'Asynchronous completion-queue architecture via kernel/userspace shared memory ring buffers',
+      maxDescriptors: 'Unlimited (Registered files and fixed buffers)',
+      kernelToUserCopy: 'Zero-copy: Dual ring buffers (Submission Queue & Completion Queue) allow zero-syscall event submission in SQPOLL mode',
+      triggerMode: 'Completion-based asynchronous model (Proactor pattern)',
+      supportedOS: 'Linux 5.1+ (Powers modern high-IOPS storage, databases, and network runtimes)',
+      verdict: 'The state-of-the-art async I/O interface on Linux; eliminates syscall overhead and handles both disk and network I/O',
     },
   ];
 }
