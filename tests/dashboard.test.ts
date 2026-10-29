@@ -132,6 +132,7 @@ describe('Dashboard learning interactions', () => {
     ui.el('#run-btn').click();
     await vi.waitFor(() => expect(ui.el('#exec-status').textContent).toBe('Error'));
     expect(ui.el('#json-output').textContent).toContain('clusterSize must be odd');
+    expect(ui.el('#stage-viewport').textContent).toContain('clusterSize must be odd');
     let finish!: (value: unknown) => void;
     ui.fetch.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
     ui.el('#run-btn').click();
@@ -141,6 +142,52 @@ describe('Dashboard learning interactions', () => {
     expect(ui.el('#exp-title').textContent).toContain('Fencing');
     expect(ui.el('#exec-status').textContent).toBe('Idle (Ready)');
     expect(ui.win.document.querySelectorAll('.metric-card')).toHaveLength(0);
+  });
+
+  it('cancels a pending run, ignores its late response, and permits a successful retry', async () => {
+    const ui = load('#consensus-quorum');
+    let finish!: (value: unknown) => void;
+    ui.fetch.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    ui.el('#run-btn').click();
+    const signal = ui.fetch.mock.calls[0][1].signal;
+    expect(ui.el('#cancel-run-btn').hidden).toBe(false);
+    ui.el('#cancel-run-btn').focus();
+    ui.el('#cancel-run-btn').click();
+    expect(signal.aborted).toBe(true);
+    expect(ui.el('#exec-status').textContent).toBe('Cancelled');
+    expect(ui.el('#stage-viewport').getAttribute('aria-busy')).toBe('false');
+    expect(ui.el('#cancel-run-btn').hidden).toBe(true);
+    expect(ui.win.document.activeElement?.id).toBe('run-btn');
+    ui.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ data: runConsensusLab(), executionDurationMs: 2 }) });
+    ui.el('#run-btn').click();
+    await vi.waitFor(() => expect(ui.el('#exec-status').textContent).toBe('Completed in 2ms'));
+    finish({ ok: true, json: async () => ({ data: runConsensusLab(), executionDurationMs: 99 }) });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(ui.el('#exec-status').textContent).toBe('Completed in 2ms');
+    const stored = JSON.parse(ui.win.localStorage.getItem(storageKey)!);
+    expect(stored.journey.runs).toEqual(['consensus-quorum']);
+    expect(ui.el('#journey-total-xp').textContent).toBe('20');
+  });
+
+  it('times out a stalled response without rewards and clears the deadline when navigating', () => {
+    const ui = load('#consensus-quorum');
+    const scheduled = vi.spyOn(ui.win, 'setTimeout');
+    ui.fetch.mockImplementation(() => new Promise(() => {}));
+    ui.el('#run-btn').click();
+    const deadline = scheduled.mock.calls.find(call => call[1] === 30_000)!;
+    expect(deadline).toBeDefined();
+    (deadline[0] as () => void)();
+    expect(ui.fetch.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(ui.el('#exec-status').textContent).toBe('Timeout');
+    expect(ui.el('#stage-viewport').textContent).toContain('30 seconds');
+    expect(ui.el('#run-btn').disabled).toBe(false);
+    expect(ui.el('#journey-total-xp').textContent).toBe('0');
+    ui.el('#run-btn').click();
+    const nextDeadline = scheduled.mock.calls.filter(call => call[1] === 30_000).at(-1)!;
+    ui.el('[data-exp="event-loop"]').click();
+    (nextDeadline[0] as () => void)();
+    expect(ui.el('#exec-status').textContent).toBe('Idle (Ready)');
+    expect(ui.el('#cancel-run-btn').hidden).toBe(true);
   });
 
   it('keeps the reachable-voter control valid when cluster membership is reduced', async () => {

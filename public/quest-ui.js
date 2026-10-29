@@ -22,6 +22,11 @@ class QuestHub {
     this.root.addEventListener('change', event => this.handleChange(event));
     this.root.addEventListener('input', event => this.handleInput(event));
     this.root.addEventListener('submit', event => this.handleSubmit(event));
+    window.addEventListener('beforeunload', event => {
+      if (!Object.keys(this.noteDrafts).some(topic => this.noteDirty(topic))) return;
+      event.preventDefault();
+      event.returnValue = '';
+    });
     this.root.querySelector('.qh-tabs').addEventListener('keydown', event => {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       const tabs = [...this.root.querySelectorAll('[data-qh-tab]')];
@@ -45,6 +50,14 @@ class QuestHub {
   topicButton(key, label = 'Open lab →', options = {}) { return key ? this.button('topic', label, key, options) : '<p class="qh-muted">You have explored every available lab.</p>'; }
   progress(value, max, label) { return `<progress value="${Math.min(value, max)}" max="${max || 1}" aria-label="${this.escape(label)}"></progress>`; }
   empty(text) { return `<p class="qh-empty">${this.escape(text)}</p>`; }
+  noteDirty(topic = this.selectedTopic) {
+    return Object.hasOwn(this.noteDrafts, topic)
+      && this.noteDrafts[topic].trim().slice(0, 1000) !== (this.engine.state.notes[topic] || '');
+  }
+  noteStatus(topic = this.selectedTopic) {
+    const length = (this.noteDrafts[topic] ?? this.engine.state.notes[topic] ?? '').length;
+    return `${this.noteDirty(topic) ? 'Unsaved changes' : this.engine.state.notes[topic] ? 'Reflection saved' : 'No saved reflection'} · ${length} / 1,000 characters`;
+  }
   selectTab(tab) { this.tab = tab; this.resetPending = false; this.render(); }
   open(tab = 'overview', topic) {
     if (!['overview', 'campaigns', 'knowledge', 'practice', 'profile', 'progress'].includes(tab)) return;
@@ -160,7 +173,7 @@ class QuestHub {
     const key = this.selectedTopic;
     const notes = Object.entries(state.notes).filter(([topic, note]) => `${this.title(topic)} ${note}`.toLowerCase().includes(this.filters.noteSearch.toLowerCase()));
     return `<div class="qh-section-intro"><h4>Build your own practice ritual</h4><p>Save useful labs, plan a sequence, and capture what you learned. Your reflections stay on this device.</p></div><div class="qh-grid">${this.sprintView()}<article class="qh-card"><span class="eyebrow">Your practice queue</span><h4>One lab, then the next</h4>${state.queue.length ? `<ol class="qh-queue">${state.queue.map((topic, index) => `<li><div><span class="qh-queue-number">${index + 1}</span>${this.topicButton(topic, this.title(topic))}</div><div class="qh-queue-controls">${this.button('queue-up', '↑', topic, { disabled: index === 0, aria: `Move ${this.title(topic)} up` })}${this.button('queue-down', '↓', topic, { disabled: index === state.queue.length - 1, aria: `Move ${this.title(topic)} down` })}${this.button('dequeue', 'Remove', topic, { aria: `Remove ${this.title(topic)} from queue` })}</div></li>`).join('')}</ol>${this.topicButton(engine.recommendedTopic('queue'), 'Resume queue →', { primary: true })}<p class="qh-footnote">A successful run removes its lab from your queue.</p>` : this.empty('Your queue is ready for its first lab. Add one below.')}</article></div>
-      <article class="qh-card qh-topic-workbench"><span class="eyebrow">Personal lab notebook</span><label>Choose a lab<select data-qh-field="practice-topic" data-qh-focus="practice-topic">${Object.keys(engine.topics).map(topic => this.option(topic, this.title(topic), key)).join('')}</select></label><div class="qh-actions">${this.topicButton(key)}${this.button('favorite', state.favorites.includes(key) ? '★ Saved to favorites' : '☆ Save favorite', key, { pressed: state.favorites.includes(key) })}${this.button('enqueue', state.queue.includes(key) ? 'In practice queue' : 'Add to practice queue', key, { disabled: state.queue.includes(key) })}</div><label>How confident do you feel?<select data-qh-field="confidence" data-qh-focus="confidence">${[[0, 'Not rated yet'], [1, '1 · I want more practice'], [2, '2 · Getting comfortable'], [3, '3 · I can explain it']].map(([value, label]) => this.option(String(value), label, String(state.confidence[key] || 0)).replace('value="0"', 'value="0" disabled')).join('')}</select></label><form data-qh-form="note"><label for="qh-note">Reflection for this lab</label><textarea id="qh-note" data-qh-field="note" data-qh-focus="note" rows="4" maxlength="1000" placeholder="What clicked? What would you like to try next?">${this.escape(this.noteDrafts[key] ?? state.notes[key] ?? '')}</textarea><div class="qh-actions"><button type="submit" class="primary-btn" data-qh-focus="save-note">Save reflection</button>${this.button('clear-note', 'Clear reflection', key, { disabled: !(state.notes[key] || this.noteDrafts[key]) })}<span class="qh-muted">Up to 1,000 characters · Saved only here</span></div></form></article>
+      <article class="qh-card qh-topic-workbench"><span class="eyebrow">Personal lab notebook</span><label>Choose a lab<select data-qh-field="practice-topic" data-qh-focus="practice-topic">${Object.keys(engine.topics).map(topic => this.option(topic, this.title(topic), key)).join('')}</select></label><div class="qh-actions">${this.topicButton(key)}${this.button('favorite', state.favorites.includes(key) ? '★ Saved to favorites' : '☆ Save favorite', key, { pressed: state.favorites.includes(key) })}${this.button('enqueue', state.queue.includes(key) ? 'In practice queue' : 'Add to practice queue', key, { disabled: state.queue.includes(key) })}</div><label>How confident do you feel?<select data-qh-field="confidence" data-qh-focus="confidence">${[[0, 'Not rated yet'], [1, '1 · I want more practice'], [2, '2 · Getting comfortable'], [3, '3 · I can explain it']].map(([value, label]) => this.option(String(value), label, String(state.confidence[key] || 0)).replace('value="0"', 'value="0" disabled')).join('')}</select></label><form data-qh-form="note"><label for="qh-note">Reflection for this lab</label><textarea id="qh-note" aria-describedby="qh-note-status" data-qh-field="note" data-qh-focus="note" rows="4" maxlength="1000" placeholder="What clicked? What would you like to try next?">${this.escape(this.noteDrafts[key] ?? state.notes[key] ?? '')}</textarea><div class="qh-actions"><button type="submit" class="primary-btn" data-qh-focus="save-note">Save reflection</button>${this.button('clear-note', 'Clear reflection', key, { disabled: !(state.notes[key] || this.noteDrafts[key]) })}<button type="button" class="secondary-btn" data-qh-action="discard-note" data-value="${this.escape(key)}" data-qh-focus="discard-note:${this.escape(key)}"${this.noteDirty(key) ? '' : ' hidden'}>Discard unsaved changes</button><span id="qh-note-status" class="qh-muted">${this.noteStatus(key)}</span></div></form></article>
       <div class="qh-grid"><article class="qh-card"><span class="eyebrow">Favorites</span><h4>Your go-to labs</h4>${state.favorites.length ? `<ul class="qh-lab-list">${state.favorites.map(topic => `<li>${this.topicButton(topic, this.title(topic))}${this.button('favorite', 'Remove', topic, { aria: `Remove ${this.title(topic)} from favorites` })}</li>`).join('')}</ul>${this.topicButton(engine.recommendedTopic('favorite'), 'Practice a favorite →')}` : this.empty('Star a lab in the notebook to keep it close.')}</article><article class="qh-card"><span class="eyebrow">Reflection journal</span><h4>Find an insight again</h4><label>Search reflections<input type="search" data-qh-filter="noteSearch" data-qh-focus="note-search" value="${this.escape(this.filters.noteSearch)}" placeholder="A topic or something you learned"></label><div class="qh-notes">${notes.map(([topic, note]) => `<article><h5>${this.escape(this.title(topic))}</h5><p>${this.escape(note)}</p>${this.button('edit-note', 'Edit reflection', topic)}</article>`).join('') || this.empty('No saved reflections match. Write one in the notebook above.')}</div></article></div>`;
   }
 
@@ -221,6 +234,8 @@ class QuestHub {
       this.noteDrafts[this.selectedTopic] = event.target.value;
       const clear = this.root.querySelector('[data-qh-action="clear-note"]');
       if (clear) clear.disabled = !(event.target.value || this.engine.state.notes[this.selectedTopic]);
+      this.root.querySelector('#qh-note-status').textContent = this.noteStatus();
+      this.root.querySelector('[data-qh-action="discard-note"]').hidden = !this.noteDirty();
     }
     const filter = event.target.dataset.qhFilter;
     if (filter && event.target.tagName === 'INPUT') { this.filters[filter] = event.target.value; this.render(); }
@@ -246,7 +261,10 @@ class QuestHub {
     if (!form) return;
     event.preventDefault();
     if (form === 'profile') this.mutate('setProfile', ['alias', this.aliasDraft], 'Display name saved.');
-    if (form === 'note') this.mutate('saveNote', [this.selectedTopic, this.noteDrafts[this.selectedTopic] ?? this.engine.state.notes[this.selectedTopic] ?? ''], 'Reflection saved on this device.');
+    if (form === 'note' && this.engine.saveNote(this.selectedTopic, this.noteDrafts[this.selectedTopic] ?? this.engine.state.notes[this.selectedTopic] ?? '')) {
+      delete this.noteDrafts[this.selectedTopic];
+      this.changed('Reflection saved.');
+    }
     if (form === 'quiz') {
       const selected = event.target.querySelector('input[name="qh-answer"]:checked');
       if (!selected) return;
@@ -290,7 +308,8 @@ class QuestHub {
     if (action === 'equip') this.mutate('equip', [value], 'Cosmetic equipped.');
     if (action === 'default-theme') this.mutate('setProfile', ['theme', 'default'], 'Default theme restored.');
     if (action === 'default-title') this.mutate('setProfile', ['title', 'Learner'], 'Default title restored.');
-    if (action === 'clear-note') { this.noteDrafts[value] = ''; this.mutate('saveNote', [value, ''], 'Reflection cleared.'); }
+    if (action === 'clear-note') { delete this.noteDrafts[value]; this.mutate('saveNote', [value, ''], 'Reflection cleared.'); }
+    if (action === 'discard-note') { delete this.noteDrafts[value]; this.render(); this.announce('Unsaved changes discarded. Your saved reflection is unchanged.'); this.root.querySelector('#qh-note').focus(); }
     if (action === 'edit-note') { this.selectedTopic = value; this.render(); this.root.querySelector('#qh-note').focus(); }
     if (action === 'claim-milestone') this.mutate('claimMilestone', [value], 'Milestone reward claimed.');
     if (action === 'pin-milestone') this.mutate('setProfile', ['pinnedMilestone', engine.state.pinnedMilestone === value ? null : value], engine.state.pinnedMilestone === value ? 'Milestone unpinned.' : 'Milestone pinned.');
@@ -317,10 +336,13 @@ class QuestHub {
     if (!file) return;
     if (file.size > 200000) { this.announce('Choose a quest export smaller than 200 KB.'); return; }
     try {
-      const result = this.engine.importData(await file.text());
+      const payload = await file.text();
+      const drafts = Object.fromEntries(Object.entries(this.noteDrafts).filter(([topic]) => this.noteDirty(topic)));
+      const result = this.engine.importData(payload);
       if (!result.ok) { this.announce(result.error || 'This file is not a valid quest progress export.'); return; }
       this.aliasDraft = this.engine.state.alias;
-      this.noteDrafts = {};
+      // Keep unsaved reflections when merging a backup; they are not part of the export.
+      this.noteDrafts = drafts;
       this.answerDrafts = {};
       this.changed('Quest progress merged successfully.');
     } catch { this.announce('The file could not be read. Choose a valid quest progress JSON export.'); }

@@ -30,7 +30,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Security Vulnerability Audit (OWASP)
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high
 
   # ========================================================
   # Stage 2: Automated Testing (Unit, Integration, Contract)
@@ -39,6 +39,25 @@ jobs:
     name: Automated Test Suite
     needs: quality-and-security
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lab_user
+          POSTGRES_PASSWORD: lab_password
+          POSTGRES_DB: mastery_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lab_user -d mastery_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -59,16 +78,52 @@ jobs:
 
       - name: Run Vitest Suite (Unit, Integration, Contract)
         run: npm run test
+        env:
+          TEST_DATABASE_URL: postgresql://lab_user:lab_password@127.0.0.1:5432/mastery_test
+          TEST_REDIS_URL: redis://127.0.0.1:6379
 
       - name: Run Go Concurrency Benchmark
         run: npm run bench:go
+
+  browser-e2e:
+    name: Browser E2E (desktop and mobile)
+    needs: quality-and-security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run real browser E2E suite
+        run: npm run test:e2e
+
+      - name: Upload browser report and failure traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
 
   # ========================================================
   # Stage 3: Containerization & Security Scanning
   # ========================================================
   build-container:
     name: Build & Containerize
-    needs: test
+    needs: [test, browser-e2e]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

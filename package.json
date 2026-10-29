@@ -19,7 +19,9 @@
     "bench:go": "go run src/companion-go/concurrency_bench.go",
     "troubleshoot": "bash src/scripts/live-troubleshoot.sh",
     "check": "npm run typecheck && npm test && npm run build",
-    "start:prod": "node dist/server.js"
+    "start:prod": "node dist/server.js",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report"
   },
   "keywords": [
     "backend",
@@ -43,6 +45,7 @@
     "ws": "^8.22.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",

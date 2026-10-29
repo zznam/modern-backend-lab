@@ -303,6 +303,62 @@ describe('Local quest tools, recommendations and portable progress', () => {
     expect(target.engine.state.alias).toBe('Pat');
   });
 
+  it('merges compatible sprint steps and grants a completed daily reward only once', () => {
+    const source = setup();
+    source.engine.startSprint(3); source.run(keys[0]); source.run(keys[1]);
+    const target = setup();
+    target.engine.startSprint(3); target.run(keys[2]);
+    const backup = source.engine.exportData();
+    target.engine.importData(backup);
+    expect(target.engine.state.sprint).toMatchObject({ status: 'complete', target: 3 });
+    expect(new Set(target.engine.state.sprint.topics)).toEqual(new Set(keys.slice(0, 3)));
+    expect(target.engine.xp()).toBe(45);
+    expect(target.engine.coins()).toBe(30);
+    target.engine.importData(backup);
+    const restored = setup(target.engine.state, target.journey.state);
+    expect(restored.engine.xp()).toBe(45);
+    expect(restored.engine.state.sprintHistory).toHaveLength(1);
+    expect(Object.keys(restored.engine.state.sprintRewards)).toHaveLength(1);
+  });
+
+  it('retains a paused sprint and combines only compatible targets', () => {
+    const source = setup();
+    source.engine.startSprint(5); source.run(keys[0]);
+    const target = setup();
+    target.engine.startSprint(5); target.run(keys[1]); target.engine.toggleSprint();
+    target.engine.importData(source.engine.exportData());
+    expect(target.engine.state.sprint).toMatchObject({ status: 'paused', target: 5, topics: [keys[1], keys[0]] });
+    expect(target.engine.xp()).toBe(0);
+    const different = setup();
+    different.engine.startSprint(3); different.run(keys[2]);
+    target.engine.importData(different.engine.exportData());
+    expect(target.engine.state.sprint).toMatchObject({ target: 5, topics: [keys[1], keys[0]] });
+  });
+
+  it('restores the latest sprint without an old local sprint hiding it', () => {
+    const source = setup();
+    source.setDate(new Date(2026, 9, 24, 12));
+    source.engine.startSprint(3); source.run(keys[0]);
+    const target = setup();
+    target.engine.startSprint(2); target.run(keys[1]);
+    target.setDate(new Date(2026, 9, 24, 12));
+    target.engine.importData(source.engine.exportData());
+    expect(target.engine.state.sprint).toMatchObject({ started: '2026-10-24', status: 'active', target: 3, topics: [keys[0]] });
+    source.engine.importData(setup({ sprint: { started: '2026-10-23', target: 2, status: 'paused', topics: [] } }).engine.exportData());
+    expect(source.engine.state.sprint.started).toBe('2026-10-24');
+  });
+
+  it('keeps the original daily reward and completed display when backup targets differ', () => {
+    const source = setup();
+    source.engine.startSprint(2); source.run(keys[0]); source.run(keys[1]);
+    const target = setup();
+    target.engine.startSprint(5); target.run(keys[2]);
+    target.engine.importData(source.engine.exportData());
+    expect(target.engine.state.sprint).toMatchObject({ status: 'complete', target: 2, topics: [keys[0], keys[1]] });
+    expect(target.engine.xp()).toBe(30);
+    expect(target.engine.state.sprintHistory).toHaveLength(1);
+  });
+
   it('does not mutate state on malformed, oversized or unsupported backup imports', () => {
     const { engine, journey } = setup();
     engine.toggleFavorite(keys[0]);

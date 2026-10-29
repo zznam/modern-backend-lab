@@ -26,6 +26,10 @@ function safeEndpoint(raw: string): string {
   } catch { return 'invalid-endpoint'; }
 }
 
+// Expected teaching outcomes are returned as rollback results. SQL/connection
+// failures must still reject so callers cannot report an unavailable lab as run.
+class TransferRejectedError extends Error {}
+
 // ========================================================
 // 1. DUAL-MODE POSTGRESQL ADAPTER
 // ========================================================
@@ -129,18 +133,19 @@ export class DualModePostgresAdapter {
     if (this.pool) {
       const client = await this.pool.connect();
       let committed = false;
+      let discardConnection = false;
       try {
         await client.query('BEGIN');
         // Lock both accounts in stable order to avoid reciprocal-transfer deadlocks.
         const accounts = await client.query('SELECT id, balance FROM accounts WHERE id IN ($1, $2) ORDER BY id FOR UPDATE', [fromId, toId]);
         const from = accounts.rows.find(row => row.id === fromId);
         const to = accounts.rows.find(row => row.id === toId);
-        if (!from || !to) throw new Error('Account not found');
-        if (Number(from.balance) < amount) throw new Error('Insufficient funds');
+        if (!from || !to) throw new TransferRejectedError('Account not found');
+        if (Number(from.balance) < amount) throw new TransferRejectedError('Insufficient funds');
         await client.query('UPDATE accounts SET balance = balance - $1, version = version + 1 WHERE id = $2', [amount, fromId]);
-        if (simulateCrashAtStep === 1) throw new Error('Simulated crash after debit');
+        if (simulateCrashAtStep === 1) throw new TransferRejectedError('Simulated crash after debit');
         await client.query('UPDATE accounts SET balance = balance + $1, version = version + 1 WHERE id = $2', [amount, toId]);
-        if (simulateCrashAtStep === 2) throw new Error('Simulated crash after credit');
+        if (simulateCrashAtStep === 2) throw new TransferRejectedError('Simulated crash after credit');
         const finalBalances = await client.query('SELECT id, balance FROM accounts WHERE id IN ($1, $2)', [fromId, toId]);
         await client.query('COMMIT');
         committed = true;
@@ -150,11 +155,22 @@ export class DualModePostgresAdapter {
           reason: 'PostgreSQL ACID transaction committed with ordered row locks.', mode: 'LIVE_DATABASE' };
       } catch (err) {
         // Never execute a second transfer against unrelated in-memory data after a live failure.
-        if (!committed) await client.query('ROLLBACK');
+        if (!committed) {
+          try { await client.query('ROLLBACK'); }
+          catch (rollbackError) {
+            discardConnection = true;
+            this.isConnected = false;
+            throw rollbackError;
+          }
+        }
+        if (!(err instanceof TransferRejectedError)) {
+          this.isConnected = false;
+          throw err;
+        }
         return { success: false, rolledBack: !committed, balances: {},
           reason: `PostgreSQL transaction failed: ${err instanceof Error ? err.message : String(err)}`, mode: 'LIVE_DATABASE' };
       } finally {
-        client.release();
+        client.release(discardConnection);
       }
     }
     if (this.databaseUrl) throw new Error('PostgreSQL is configured but unavailable');

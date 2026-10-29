@@ -136,6 +136,60 @@ describe('Quest hub application integration', () => {
 });
 
 describe('Quest hub regression interactions', () => {
+  it('merges sprint backups through the UI and retains one completion after reload', async () => {
+    const source = load();
+    source.win.eval("quests.startSprint(3); learning.recordRun('event-loop'); learning.recordRun('data-structures')");
+    const backup = source.win.eval('quests.exportData()');
+    const target = load();
+    target.win.eval("quests.startSprint(3); learning.recordRun('observability'); hub.open('practice')");
+    await target.win.eval(`hub.importFile({ size: ${Buffer.byteLength(backup)}, text: async () => ${JSON.stringify(backup)} })`);
+    expect(target.el('#qh-panel').textContent).toContain('3 / 3 labs');
+    expect(target.el('#qh-panel').textContent).toContain('Completed today');
+    expect(target.el('#journey-total-xp').textContent).toBe('105');
+    const restored = load('#journey', target.saved());
+    expect(restored.el('#journey-total-xp').textContent).toBe('105');
+    expect(restored.win.eval('quests.state.sprintHistory.length')).toBe(1);
+  });
+
+  it('keeps reflection drafts through refresh, tab changes and import until saved or discarded', async () => {
+    const ui = load();
+    ui.win.eval("quests.saveNote('event-loop', 'Saved thought'); hub.open('practice', 'event-loop')");
+    const backup = ui.win.eval('quests.exportData()');
+    ui.el('#qh-note').value = 'A private unsaved insight';
+    ui.el('#qh-note').dispatchEvent(new ui.win.Event('input', { bubbles: true }));
+    expect(ui.el('#qh-note-status').textContent).toContain('Unsaved changes');
+    const closing = new ui.win.Event('beforeunload', { cancelable: true });
+    ui.win.dispatchEvent(closing);
+    expect(closing.defaultPrevented).toBe(true);
+    ui.el('[data-qh-tab="overview"]').click();
+    ui.win.dispatchEvent(new ui.win.Event('focus'));
+    await ui.win.eval(`hub.importFile({ size: ${Buffer.byteLength(backup)}, text: async () => ${JSON.stringify(backup)} })`);
+    ui.el('[data-qh-tab="practice"]').click();
+    expect(ui.el('#qh-note').value).toBe('A private unsaved insight');
+    expect(ui.win.eval("quests.state.notes['event-loop']")).toBe('Saved thought');
+    ui.el('[data-qh-action="discard-note"]').click();
+    expect(ui.el('#qh-note').value).toBe('Saved thought');
+    expect(ui.el('#qh-note-status').textContent).toContain('Reflection saved');
+    const afterDiscard = new ui.win.Event('beforeunload', { cancelable: true });
+    ui.win.dispatchEvent(afterDiscard);
+    expect(afterDiscard.defaultPrevented).toBe(false);
+    ui.el('#qh-note').value = 'An insight worth keeping';
+    ui.el('#qh-note').dispatchEvent(new ui.win.Event('input', { bubbles: true }));
+    ui.el('[data-qh-form="note"]').dispatchEvent(new ui.win.Event('submit', { bubbles: true, cancelable: true }));
+    expect(ui.el('#qh-note-status').textContent).toContain('Reflection saved');
+    expect(JSON.parse(ui.saved()).quests.notes['event-loop']).toBe('An insight worth keeping');
+    const afterSave = new ui.win.Event('beforeunload', { cancelable: true });
+    ui.win.dispatchEvent(afterSave);
+    expect(afterSave.defaultPrevented).toBe(false);
+    ui.el('[data-qh-action="clear-note"]').click();
+    ui.el('#qh-note').dispatchEvent(new ui.win.Event('input', { bubbles: true }));
+    await ui.win.eval(`hub.importFile({ size: ${Buffer.byteLength(backup)}, text: async () => ${JSON.stringify(backup)} })`);
+    expect(ui.el('#qh-note').value).toBe('Saved thought');
+    const afterImport = new ui.win.Event('beforeunload', { cancelable: true });
+    ui.win.dispatchEvent(afterImport);
+    expect(afterImport.defaultPrevented).toBe(false);
+  });
+
   it('restores validated journey preferences and their visible controls through file import', async () => {
     const source = load();
     source.win.eval(`learning.state.goal = 5; learning.state.range = 28; learning.state.reviewInterval = 14;
