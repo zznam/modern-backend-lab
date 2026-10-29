@@ -6,3 +6,5 @@ graft
 .env.*
 *.log
 coverage
+playwright-report
+test-results

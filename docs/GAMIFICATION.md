@@ -114,6 +114,12 @@ Quest state is saved with the existing browser learning state. Alias, confidence
 
 Campaign and sprint steps are recorded from successful lab responses. Rewards are derived from unique valid records; reloads, repeated claims, repeated correct answers, and duplicate purchases do not create new rewards. Restore validates the format/version, limits input size, discards unknown topic and reward IDs, merges known progress, and recalculates balances. As with any browser-owned learning journal, a user can edit their own data; this is personal motivation, not a competitive anti-cheat system.
 
+Sprint restore selects the newer dated sprint. For matching dates and targets, it combines distinct evidenced steps and preserves the current pause/resume choice; enough combined steps complete the sprint and earn one daily reward. Conflicting targets preserve the current target unless a reward was already earned that day, in which case the completed sprint displays that reward's original target and steps. Re-importing a backup never grants that day's reward again.
+
+The October 30, 2026 validation pass covers these changes with real browser and live-service tests; see [validation results and improvement rationale](VALIDATION.md).
+
+The reflection editor shows its character count and whether changes are saved. Unsaved drafts survive Quest Hub tab changes, periodic refreshes, and backup imports within the current page. **Discard unsaved changes** returns to the saved reflection. Closing or reloading a page with an unsaved reflection requests the browser's standard leave-page confirmation where supported. Drafts remain in memory until saved; backups include saved reflections only, so use **Save reflection** before exporting or leaving the page.
+
 Mastery tiers summarize three signals: a successful run, an explicit completion mark, and a solved knowledge check when the topic has one. Confidence is a separate self-assessment. Only twelve topics have knowledge checks in this release, so topics without a check cannot earn that additional mastery signal.
 
 Dates use the learner's local browser calendar. Weekly progress counts distinct successful labs since Monday; monthly activity counts unique lab/day pairs, not every repeat invocation. Sprints are daily goals rather than speed contests, and their history retains the latest twenty completions.

@@ -399,6 +399,26 @@ class QuestEngine {
     }
     merged.sprintHistory = [...current.sprintHistory, ...incoming.sprintHistory];
     merged.sprint = current.sprint || incoming.sprint;
+    if (current.sprint && incoming.sprint) {
+      if (incoming.sprint.started > current.sprint.started) merged.sprint = incoming.sprint;
+      else if (incoming.sprint.started === current.sprint.started && incoming.sprint.target === current.sprint.target) {
+        merged.sprint = { ...current.sprint, topics: this.knownList([...current.sprint.topics, ...incoming.sprint.topics]) };
+      }
+    }
+    if (merged.sprint) {
+      const sprint = merged.sprint;
+      // Compatible backups can together finish a sprint. A reward already earned
+      // that day wins, even when the backups chose different sprint targets.
+      if (!merged.sprintRewards[sprint.started] && sprint.topics.length >= sprint.target) {
+        merged.sprintRewards[sprint.started] = { target: sprint.target, topics: sprint.topics.slice(0, sprint.target) };
+      }
+      const reward = merged.sprintRewards[sprint.started];
+      if (reward) {
+        merged.sprint = { ...sprint, target: reward.target, topics: [...reward.topics], status: 'complete' };
+        merged.sprintHistory = merged.sprintHistory.filter(item => item.started !== sprint.started);
+        merged.sprintHistory.push({ ...merged.sprint, topics: [...merged.sprint.topics] });
+      }
+    }
     if (!current.activeCampaign) merged.activeCampaign = incoming.activeCampaign;
     for (const key of this.knownList(data.completed)) this.completed.add(key);
     this.state = this.normalize(merged);

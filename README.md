@@ -84,6 +84,8 @@ The dashboard includes **46 runnable topics**. Search by concept (for example, `
 
 The four new data-systems labs include **scenario presets** that populate the controls and explain what to look for before you run. Run an advanced lab twice to compare the previous and current parameters and metrics. Comparisons keep successful runs for each topic in memory during the current page session; reloading clears them.
 
+Use **Cancel run** to stop waiting for an experiment. Requests also time out after 30 seconds, restoring the Run button. Canceled, timed-out, and failed requests never earn progress; the server may still be finishing a canceled experiment. Errors appear directly in the results area so you can retry when ready.
+
 Use **Mark complete** to track learning explicitly, **Next topic** to follow the chosen path, and **Copy topic link** to share a URL such as `http://localhost:4000/#consensus-quorum`. Completion, the selected path, and the last viewed topic are saved in browser local storage; a valid URL fragment takes precedence on load. Storage failures fall back to session-only progress. No learning history is sent to the server.
 
 Open **Learning journey** in the header (or `/#journey`) for:
@@ -147,6 +149,15 @@ npm run check
 ```
 The HTTP integration suite starts an ephemeral local server and runs every dashboard module, custom advanced scenarios, order creation/replay, input rejection, metrics, readiness, and WebSocket echo. The local DOM suite tests search, combined filters, paths, completion persistence, deep links, prerequisite navigation, keyboard tabs, result rendering, stale responses, and storage failure using Happy DOM with external resources and network requests disabled/mocked. These DOM tests do not replace visual checks in a real browser. The memory-leak module intentionally emits a `MaxListenersExceededWarning` before cleaning up its listeners.
 
+Run the real browser E2E suite after installing Chromium once:
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+Playwright builds and starts an isolated compiled server on `127.0.0.1:4179`, then exercises all 46 labs and all 12 scenario presets through their UI and real HTTP API. Desktop and mobile flows cover filters, keyboard navigation, completion persistence, campaign and sprint rewards, quizzes, private notes, backup download/import, failure recovery, and narrow layouts. Cancellation and timeout tests deliberately delay a response to verify that abandoned runs earn no progress and can be retried. External font requests are blocked so unavailable font services cannot break local tests. Each test gets fresh browser storage; database URLs are cleared for these simulator-based tests. The live PostgreSQL and Redis tests below validate real storage separately.
+
+Use `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e` to test with installed Google Chrome, or `E2E_PORT=4180 npm run test:e2e` if the default port is occupied. The runner refuses to reuse an existing server. Run `npm run check && npm run test:e2e` for both validation gates. Inspect the HTML report with `npm run test:e2e:report`; failing tests retain screenshots and traces under `test-results/`. CI runs the same desktop/mobile Chromium suite and uploads its report.
+
 To include real PostgreSQL rollback, missing-account, and concurrent-transfer tests, provide a **disposable** test database (the tests reset the two seeded lab accounts):
 ```bash
 TEST_DATABASE_URL=postgresql://lab_user:lab_password@localhost:5432/mastery_db npm test
@@ -156,6 +167,8 @@ PostgreSQL tests are skipped when `TEST_DATABASE_URL` is absent. Live Redis test
 TEST_REDIS_URL=redis://127.0.0.1:6379 npm test
 ```
 Use a disposable Redis instance; tests create uniquely prefixed short-lived values, locks, and a leaderboard. Both test URLs can be set together. Configured PostgreSQL and Redis failure paths also have isolated adapter tests.
+
+CI supplies disposable PostgreSQL and Redis service containers and sets both test URLs, including the HTTP-to-live-storage readiness and recovery checks. Its dependency audit fails on high-severity findings.
 
 To load-test an already-running local server:
 ```bash

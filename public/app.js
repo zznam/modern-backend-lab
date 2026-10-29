@@ -305,6 +305,7 @@ const expDescEl = document.getElementById('exp-desc');
 const controlsContainer = document.getElementById('controls-container');
 const scenarioContainer = document.getElementById('scenario-container');
 const runBtn = document.getElementById('run-btn');
+const cancelRunBtn = document.getElementById('cancel-run-btn');
 const metricsGrid = document.getElementById('metrics-cards');
 const stageViewport = document.getElementById('stage-viewport');
 const execStatus = document.getElementById('exec-status');
@@ -640,9 +641,11 @@ function selectExperiment(key, updateHash = true) {
 
 function resetRunDisplay(message = 'Predict the outcome, then run the experiment to inspect its results.') {
   selectionVersion++;
+  clearTimeout(activeRun?.timeout);
   activeRun?.controller.abort();
   activeRun = null;
   runBtn.disabled = false;
+  cancelRunBtn.hidden = true;
   stageViewport.setAttribute('aria-busy', 'false');
   metricsGrid.innerHTML = '';
   stageViewport.innerHTML = `<div class="placeholder-graphic">${escapeHtml(message)}</div>`;
@@ -650,6 +653,18 @@ function resetRunDisplay(message = 'Predict the outcome, then run the experiment
   execStatus.style.color = 'var(--text-dim)';
   jsonOutput.textContent = '// Ready to run...';
 }
+
+function stopWaitingForRun(status, message) {
+  if (!activeRun) return;
+  const restoreFocus = document.activeElement === cancelRunBtn;
+  resetRunDisplay(message);
+  execStatus.textContent = status;
+  execStatus.style.color = 'var(--accent-yellow)';
+  jsonOutput.textContent = message;
+  if (restoreFocus) runBtn.focus();
+}
+cancelRunBtn.addEventListener('click', () => stopWaitingForRun('Cancelled',
+  'Stopped waiting for this run. No learning progress was recorded. The server may still be finishing the experiment; wait briefly before trying again.'));
 
 function updateScenarioSelection() {
   const cfg = EXPERIMENTS_CONFIG[currentExpKey];
@@ -702,7 +717,12 @@ runBtn.addEventListener('click', async () => {
   execStatus.textContent = 'Running...';
   execStatus.style.color = 'var(--accent-yellow)';
   runBtn.disabled = true;
+  cancelRunBtn.hidden = false;
   stageViewport.setAttribute('aria-busy', 'true');
+  run.timeout = setTimeout(() => {
+    if (activeRun === run) stopWaitingForRun('Timeout',
+      'No result arrived within 30 seconds. No learning progress was recorded. Check your connection and try again; the server may still be finishing the experiment.');
+  }, 30_000);
 
   try {
     const response = await fetch('/api/experiments/run', {
@@ -733,14 +753,17 @@ runBtn.addEventListener('click', async () => {
   } catch (err) {
     if (version !== selectionVersion || activeRun !== run) return;
     metricsGrid.innerHTML = '';
-    stageViewport.textContent = 'The experiment could not complete. See the error below.';
+    stageViewport.textContent = `The experiment could not complete: ${err.message}. You can try running it again.`;
     execStatus.textContent = 'Error';
     execStatus.style.color = 'var(--accent-red)';
     jsonOutput.textContent = `Error executing experiment: ${err.message}`;
   } finally {
+    clearTimeout(run.timeout);
     if (activeRun === run) {
       activeRun = null;
       runBtn.disabled = false;
+      if (document.activeElement === cancelRunBtn) runBtn.focus();
+      cancelRunBtn.hidden = true;
       stageViewport.setAttribute('aria-busy', 'false');
     }
   }

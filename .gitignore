@@ -10,3 +10,7 @@ dist/
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
 .vercel
+
+# Browser E2E artifacts
+/playwright-report/
+/test-results/

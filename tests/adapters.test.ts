@@ -56,6 +56,25 @@ describe('Configured services must not silently switch data stores', () => {
     mocks.pool.connect.mockRejectedValue(new Error('offline'));
     await expect(db.executeAtomicTransfer('acc_alice', 'acc_bob', 50)).rejects.toThrow('offline');
   });
+  it('propagates SQL failures instead of returning a normal teaching rollback', async () => {
+    const db = new DualModePostgresAdapter('postgresql://localhost/db');
+    mocks.connection.query.mockImplementation(async (sql: string) => {
+      if (sql.includes('FOR UPDATE')) throw new Error('relation accounts does not exist');
+      return { rows: [] };
+    });
+    await expect(db.executeAtomicTransfer('acc_alice', 'acc_bob', 50)).rejects.toThrow('relation accounts');
+    expect(mocks.connection.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(mocks.connection.release).toHaveBeenCalledWith(false);
+  });
+  it('discards a connection when rollback fails instead of returning it to the pool', async () => {
+    const db = new DualModePostgresAdapter('postgresql://localhost/db');
+    mocks.connection.query.mockImplementation(async (sql: string) => {
+      if (sql === 'ROLLBACK') throw new Error('Connection terminated');
+      return { rows: [] };
+    });
+    await expect(db.executeAtomicTransfer('acc_alice', 'missing', 50)).rejects.toThrow('Connection terminated');
+    expect(mocks.connection.release).toHaveBeenCalledExactlyOnceWith(true);
+  });
   it('lazily connects Redis without requiring a readiness request first', async () => {
     const redis = new DualModeRedisAdapter('redis://localhost:6379');
     mocks.redis.set.mockResolvedValue('OK');

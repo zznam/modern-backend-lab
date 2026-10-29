@@ -561,6 +561,7 @@ code {
 .action-cluster { flex-shrink: 0; margin-left: 16px; }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 3px; }
 .primary-btn:disabled { opacity: .65; cursor: wait; transform: none; }
+.action-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .skip-link { position: fixed; top: -100px; left: 12px; z-index: 10; padding: 12px; background: var(--bg-elevated); color: white; }
 .skip-link:focus { top: 12px; }
 .stage-body { overflow-x: auto; }
