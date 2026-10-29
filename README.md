@@ -154,9 +154,15 @@ Run the real browser E2E suite after installing Chromium once:
 npx playwright install chromium
 npm run test:e2e
 ```
-Playwright builds and starts an isolated compiled server on `127.0.0.1:4179`, then exercises all 46 labs and all 12 scenario presets through their UI and real HTTP API. Desktop and mobile flows cover filters, keyboard navigation, completion persistence, campaign and sprint rewards, quizzes, private notes, backup download/import, failure recovery, and narrow layouts. Cancellation and timeout tests deliberately delay a response to verify that abandoned runs earn no progress and can be retried. External font requests are blocked so unavailable font services cannot break local tests. Each test gets fresh browser storage; database URLs are cleared for these simulator-based tests. The live PostgreSQL and Redis tests below validate real storage separately.
+Playwright builds and starts an isolated compiled server on `127.0.0.1:4179`, then exercises all 46 labs and all 12 scenario presets through their UI and real HTTP API. Desktop and mobile flows cover filters, keyboard navigation, completion persistence, campaign and sprint rewards, quizzes, private notes, backup download/import, failure recovery, and narrow layouts. A browser WebSocket test checks the `/ws` upgrade, welcome message, JSON acknowledgement, and connection cleanup. Cancellation and timeout tests deliberately delay a response to verify that abandoned runs earn no progress and can be retried. External font requests are blocked so unavailable font services cannot break local tests. Each test gets fresh browser storage; database URLs are cleared for these simulator-based tests. The live PostgreSQL and Redis tests below validate real storage separately.
 
 Use `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e` to test with installed Google Chrome, or `E2E_PORT=4180 npm run test:e2e` if the default port is occupied. The runner refuses to reuse an existing server. Run `npm run check && npm run test:e2e` for both validation gates. Inspect the HTML report with `npm run test:e2e:report`; failing tests retain screenshots and traces under `test-results/`. CI runs the same desktop/mobile Chromium suite and uploads its report.
+
+To run the same suite against a deployed teaching lab, provide its HTTPS origin:
+```bash
+E2E_BASE_URL=https://modern-backend-lab.vercel.app PLAYWRIGHT_CHANNEL=chrome npm run test:e2e
+```
+Remote mode does not build or start a local server. Before running any experiments, it checks `/api/v1/ready` and requires both adapters to use ready in-memory simulators; it refuses deployments connected to real PostgreSQL or Redis stores. The suite runs experiments serially and uses fresh browser contexts, but it can change the deployment's transient simulator state. Use only a teaching deployment you own. The URL must contain no credentials, path, query, or fragment. Remote reports are written to `playwright-report-live/` and traces to `test-results-live/`; view the report with `npx playwright show-report playwright-report-live`. Local runs use separate artifact directories.
 
 To include real PostgreSQL rollback, missing-account, and concurrent-transfer tests, provide a **disposable** test database (the tests reset the two seeded lab accounts):
 ```bash
