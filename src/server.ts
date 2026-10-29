@@ -655,4 +655,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
 }
 
 export { app, server };
-export default app;
+// Function hosts must receive the HTTP server so its WebSocket upgrade listener
+// is preserved alongside the Express request handler.
+export default server;

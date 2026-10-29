@@ -13,4 +13,6 @@ dist/
 
 # Browser E2E artifacts
 /playwright-report/
+/playwright-report-live/
+/test-results-live/
 /test-results/
