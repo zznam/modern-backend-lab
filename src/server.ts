@@ -141,6 +141,10 @@ app.get('/api/v1/ready', async (req, res) => {
   const allHealthy = pgHealth.status !== 'DISCONNECTED' && redisHealth.status !== 'DISCONNECTED';
   res.status(allHealthy ? 200 : 503).json({
     status: allHealthy ? 'READY' : 'DEGRADED',
+    deployment: {
+      id: process.env.VERCEL_DEPLOYMENT_ID || null,
+      commitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
+    },
     adapters: {
       postgres: pgHealth,
       redis: redisHealth,

@@ -1,0 +1,17 @@
+# Keep this version aligned with @playwright/test in package-lock.json.
+FROM mcr.microsoft.com/playwright:v1.64.1-noble
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci && node -e "if (require('@playwright/test/package.json').version !== '1.64.1') throw new Error('Update Dockerfile.e2e to match the locked Playwright version')"
+
+COPY playwright.config.js ./
+COPY tests/e2e/ ./tests/e2e/
+COPY public/ ./public/
+
+ENV CI=1
+
+# This image contains only remote tests, never a local application server.
+ENTRYPOINT ["sh", "-c", "case \"${E2E_BASE_URL:-}\" in https://*) exec \"$@\" ;; *) echo 'E2E_BASE_URL must be an HTTPS origin for live E2E' >&2; exit 2 ;; esac", "--"]
+CMD ["npm", "run", "test:e2e"]

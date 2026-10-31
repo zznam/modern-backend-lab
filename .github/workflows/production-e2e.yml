@@ -1,0 +1,94 @@
+name: Production deployment E2E
+
+on:
+  repository_dispatch:
+    types: [vercel.deployment.promoted]
+  workflow_dispatch:
+    inputs:
+      deployment_id:
+        description: Vercel production deployment ID (dpl_...)
+        required: true
+      deployment_url:
+        description: Immutable HTTPS deployment origin
+        required: true
+      commit_sha:
+        description: Full deployed commit SHA from main history
+        required: true
+
+permissions:
+  contents: read
+
+# Deliberately no concurrency cancellation: each promotion gets its own run,
+# including redeployments and promotions of a previously verified commit.
+jobs:
+  target:
+    name: Validate production deployment
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.client_payload.environment == 'production' &&
+        github.event.client_payload.project.id == 'prj_pNttLosL1ocNsfDPbDAn0MPTQoQq'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      id: ${{ steps.target.outputs.id }}
+      url: ${{ steps.target.outputs.url }}
+      sha: ${{ steps.target.outputs.sha }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+      - name: Validate event and trusted commit ancestry
+        id: target
+        run: node --experimental-strip-types scripts/production-target.ts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  live-e2e:
+    name: Verify production in local Docker
+    needs: target
+    runs-on: [self-hosted, Linux, ARM64, modern-backend-production]
+    environment: production-e2e
+    timeout-minutes: 20
+    steps:
+      - name: Checkout deployed commit
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.target.outputs.sha }}
+          persist-credentials: false
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify pinned browser version
+        run: node -e "if (require('@playwright/test/package.json').version !== '1.64.1') throw new Error('Rebuild the local runner for the locked Playwright version')"
+      - name: Run all desktop and mobile production tests
+        run: npm run test:e2e
+        env:
+          CI: '1'
+          E2E_BASE_URL: ${{ needs.target.outputs.url }}
+          E2E_EXPECTED_DEPLOYMENT_ID: ${{ needs.target.outputs.id }}
+          E2E_EXPECTED_COMMIT_SHA: ${{ needs.target.outputs.sha }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - name: Upload production report and failure screenshots
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: production-e2e-${{ needs.target.outputs.id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report-live/
+            test-results-live/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Record verified deployment
+        if: always()
+        env:
+          DEPLOYMENT_URL: ${{ needs.target.outputs.url }}
+          DEPLOYMENT_ID: ${{ needs.target.outputs.id }}
+          DEPLOYMENT_SHA: ${{ needs.target.outputs.sha }}
+          TEST_RESULT: ${{ job.status }}
+        run: |
+          printf 'Production E2E: %s\n\nURL: %s\n\nDeployment: `%s`\n\nCommit: `%s`\n' \
+            "$TEST_RESULT" "$DEPLOYMENT_URL" "$DEPLOYMENT_ID" "$DEPLOYMENT_SHA" >> "$GITHUB_STEP_SUMMARY"
