@@ -164,6 +164,18 @@ E2E_BASE_URL=https://modern-backend-lab.vercel.app PLAYWRIGHT_CHANNEL=chrome npm
 ```
 Remote mode does not build or start a local server. Before running any experiments, it checks `/api/v1/ready` and requires both adapters to use ready in-memory simulators; it refuses deployments connected to real PostgreSQL or Redis stores. The suite runs experiments serially and uses fresh browser contexts, but it can change the deployment's transient simulator state. Use only a teaching deployment you own. The URL must contain no credentials, path, query, or fragment. Remote reports are written to `playwright-report-live/` and traces to `test-results-live/`; view the report with `npx playwright show-report playwright-report-live`. Local runs use separate artifact directories.
 
+Run the same live suite in local Docker without installing browsers on the host:
+```bash
+npm run test:e2e:live:docker
+```
+This builds `Dockerfile.e2e` with the locked Playwright version and defaults to the public production alias. Set `E2E_BASE_URL` to override it. Only the two report directories are mounted; dependencies and test files live in the image.
+
+Production verification runs automatically from Vercel's `vercel.deployment.promoted` repository dispatch event, covering automatic releases, redeployments, and manual promotions. The [production workflow](.github/workflows/production-e2e.yml) validates the project, production environment, immutable deployment URL, and commit ancestry on `main` before dispatching browser tests to the dedicated **local Docker ARM64 runner**. Each promotion queues its own run; newer deployments do not cancel older verification. The runner checks out the deployed SHA and tests its immutable URL, so moving the public alias cannot change which release is tested. Readiness exposes only the deployment ID and commit SHA, which the suite verifies before and after testing.
+
+The GitHub `production-e2e` environment allows only `main` and stores `VERCEL_AUTOMATION_BYPASS_SECRET` as an encrypted environment secret. It grants access to this Vercel project's protected deployments, and is passed only to the browser-test step. Each browser context receives a scoped bypass cookie through one request that cannot follow redirects; credentials are never added to third-party requests. Traces are disabled for protected runs because they can contain authentication data; HTML reports and failure screenshots remain available as Actions artifacts for 14 days. Deployment Protection stays enabled. The existing public-alias command needs no credential.
+
+See [local runner operations](ops/local-runner/README.md) to start, inspect, stop, remove, or rebuild the runner. **Docker Desktop and this computer must stay running for production checks to execute**; otherwise GitHub queues them. A manual rerun is available in Actions → Production deployment E2E with the immutable URL, deployment ID, and full commit SHA. Vercel's Git provider setting `disableRepositoryDispatchEvents` must remain `false`. When updating Playwright, update and rebuild both Docker images to match the lockfile before new checks run.
+
 To include real PostgreSQL rollback, missing-account, and concurrent-transfer tests, provide a **disposable** test database (the tests reset the two seeded lab accounts):
 ```bash
 TEST_DATABASE_URL=postgresql://lab_user:lab_password@localhost:5432/mastery_db npm test

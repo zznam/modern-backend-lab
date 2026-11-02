@@ -1,6 +1,38 @@
 import { test as base, expect } from '@playwright/test';
+import { protectionHeaders } from './remote-target.ts';
+
+export async function authorizeDeployment(context, baseURL) {
+  const headers = protectionHeaders(baseURL);
+  if (Object.keys(headers).length) {
+    // Node fetch is deliberately outside Playwright's API instrumentation:
+    // even a caught APIRequestContext error can expose headers in the report.
+    try {
+      const response = await fetch(`${baseURL}/api/v1/ready`, {
+        headers: { ...headers, 'x-vercel-set-bypass-cookie': 'true' },
+        redirect: 'manual', signal: AbortSignal.timeout(15_000),
+      });
+      const location = response.headers.get('location');
+      if (![200, 302, 307].includes(response.status)
+        || (location && new URL(location, baseURL).origin !== baseURL)) {
+        throw new Error('Unexpected protection response');
+      }
+      const cookie = response.headers.getSetCookie().find(value => value.startsWith('_vercel_jwt='));
+      const value = cookie?.split(';', 1)[0].slice('_vercel_jwt='.length);
+      if (!value || !/^[A-Za-z0-9._-]+$/.test(value)) throw new Error('Missing protection cookie');
+      await context.addCookies([{ name: '_vercel_jwt', value, url: baseURL,
+        secure: true, httpOnly: true, sameSite: 'Lax' }]);
+    } catch {
+      // Native request errors may include secret headers in their call log.
+      throw new Error('Could not establish protected deployment browser access.');
+    }
+  }
+}
 
 export const test = base.extend({
+  context: async ({ context, baseURL }, use) => {
+    await authorizeDeployment(context, baseURL);
+    await use(context);
+  },
   page: async ({ page }, use) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));

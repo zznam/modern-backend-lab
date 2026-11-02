@@ -29,7 +29,8 @@ export default defineConfig({
   use: {
     baseURL,
     channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
-    trace: 'retain-on-failure',
+    // Protected runs use a scoped bypass cookie; traces can contain credentials.
+    trace: process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   projects: [

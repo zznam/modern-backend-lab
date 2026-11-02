@@ -75,6 +75,18 @@ describe('Dashboard → HTTP → labs', () => {
     expect(metrics).toContain('http_requests_total');
   });
 
+  it('identifies the deployed revision without exposing other environment values', async () => {
+    vi.stubEnv('VERCEL_DEPLOYMENT_ID', 'dpl_readiness_test');
+    vi.stubEnv('VERCEL_GIT_COMMIT_SHA', 'a'.repeat(40));
+    try {
+      const response = await fetch(`${base}/api/v1/ready`);
+      const body = await response.json() as { deployment: unknown };
+      expect(body.deployment).toEqual({ id: 'dpl_readiness_test', commitSha: 'a'.repeat(40) });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it.each([
     ['replication-quorums', { readQuorum: 1, writeQuorum: 1, failedReplicas: 1 }, () => runReplicationLab(1, 1, 1)],
     ['replication-quorums', { readQuorum: 3, writeQuorum: 3, failedReplicas: 2 }, () => runReplicationLab(3, 3, 2)],

@@ -21,7 +21,8 @@
     "check": "npm run typecheck && npm test && npm run build",
     "start:prod": "node dist/server.js",
     "test:e2e": "playwright test",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:live:docker": "bash scripts/run-live-e2e-docker.sh"
   },
   "keywords": [
     "backend",

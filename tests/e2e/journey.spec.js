@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { test, expect, runLab, openHub, savedProgress } from './fixtures.js';
+import { test, expect, runLab, openHub, savedProgress, authorizeDeployment } from './fixtures.js';
 
 test('search, combined filters, keyboard tabs, paths, and completion survive reload', async ({ page }) => {
   await page.goto('/');
@@ -114,6 +114,7 @@ test('downloaded backup restores notes and progress, merges twice, and rejects m
   const context = await browser.newContext({ baseURL, viewport, isMobile, hasTouch, deviceScaleFactor, userAgent });
   const errors = [];
   try {
+    await authorizeDeployment(context, baseURL);
     const restored = await context.newPage();
     restored.on('pageerror', error => errors.push(error.message));
     await restored.route('https://fonts.googleapis.com/**', route => route.abort());
