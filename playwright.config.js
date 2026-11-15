@@ -37,7 +37,7 @@ export default defineConfig({
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },
     {
       name: 'mobile-chromium',
-      testMatch: '**/journey.spec.js',
+      testMatch: ['**/journey.spec.js', '**/studio.spec.js'],
       use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
     },
   ],
