@@ -750,6 +750,7 @@ runBtn.addEventListener('click', async () => {
       previousRuns.set(key, snapshot);
     }
     journey.recordRun(key);
+    window.dispatchEvent(new CustomEvent('backend-lab:success', { detail: { topic: key, params, response: res } }));
   } catch (err) {
     if (version !== selectionVersion || activeRun !== run) return;
     metricsGrid.innerHTML = '';

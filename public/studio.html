@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Study studio · Backend Lab</title>
+  <link rel="stylesheet" href="studio.css">
+</head>
+<body>
+  <a class="skip" href="#studio-main">Skip to workspace</a>
+  <header class="studio-header"><a href="/" class="brand">⚡ Backend Lab</a><span>Study studio</span><a href="/">Open the labs ↗</a></header>
+  <div class="studio-layout">
+    <aside><p class="eyebrow">Your engineering practice</p><nav id="studio-nav" aria-label="Study workspace"></nav><p class="local-caption">Private to this browser.<br>Back up your work in Settings.</p></aside>
+    <main id="studio-main" tabindex="-1"><div class="page-heading"><div><p class="eyebrow" id="studio-eyebrow">Make learning tangible</p><h1 id="studio-title" tabindex="-1">Overview</h1></div><div id="studio-actions" class="actions"></div></div><p id="studio-message" role="status" aria-live="polite"></p><p id="storage-warning" role="status"></p><div id="studio-filters"></div><div id="studio-content"></div></main>
+  </div>
+  <dialog id="studio-dialog" aria-labelledby="dialog-title"><div class="dialog-heading"><h2 id="dialog-title"></h2><button type="button" data-action="close" aria-label="Close dialog">×</button></div><div id="dialog-content"></div><p id="dialog-error" role="alert"></p></dialog>
+  <script src="curriculum.js"></script><script src="quest-catalog.js"></script><script src="studio-catalog.js"></script><script src="studio-store.js"></script><script src="studio-ui.js"></script>
+</body>
+</html>
