@@ -3,6 +3,7 @@ import { productionTarget } from '../scripts/production-target.ts';
 import { protectionHeaders, verifyRemoteTarget } from './e2e/remote-target.ts';
 
 const url = 'https://modern-backend-83dqzbuor-zznams-projects.vercel.app';
+const currentUrl = 'https://modern-backend-6719wa889-zznam.vercel.app';
 const sha = '45ee445cd58a6f7433f28d065cdcbf01e0b71e9e';
 const id = 'dpl_example';
 const event = () => ({
@@ -21,6 +22,13 @@ describe('production deployment event contract', () => {
     expect(productionTarget({ inputs: { deployment_id: id, deployment_url: url, commit_sha: sha } },
       'workflow_dispatch')).toEqual({ id, url, sha });
   });
+  it('accepts the immutable URL under the current Vercel team slug', () => {
+    const input = event();
+    input.client_payload.url = currentUrl;
+    vi.stubEnv('VERCEL_AUTOMATION_BYPASS_SECRET', 'test-only-credential');
+    expect(productionTarget(input, 'repository_dispatch')).toEqual({ id, url: currentUrl, sha });
+    expect(protectionHeaders(currentUrl)).toEqual({ 'x-vercel-protection-bypass': 'test-only-credential' });
+  });
   it.each(['preview', 'staging', ''])('rejects %s environments', environment => {
     const input = event(); input.client_payload.environment = environment;
     expect(() => productionTarget(input, 'repository_dispatch')).toThrow(/production promotion/);
@@ -34,6 +42,8 @@ describe('production deployment event contract', () => {
   });
   it.each([
     'https://evil.example', 'https://modern-backend-lab.vercel.app',
+    'https://modern-backend-lab-git-main-zznam.vercel.app',
+    'https://modern-backend-6719wa889-zznam.vercel.app.example.com',
     `${url}/path`, `${url}?secret=x`, `${url}#fragment`, `${url}:8443`,
     url.replace('https:', 'http:'), url.replace('https://', 'https://user:pass@'),
   ])('rejects an unsafe or mutable deployment URL: %s', unsafe => {
