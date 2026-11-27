@@ -2,8 +2,8 @@
 const QUEST_CAMPAIGNS = [
   {
     id: 'runtime-foundations', title: 'Runtime field guide', level: 'foundation',
-    description: 'Predict callback order, choose a bounded data structure, and identify the signals that reveal a busy service.',
-    topics: ['event-loop', 'data-structures', 'observability'], xp: 80, coins: 10,
+    description: 'Predict callback order, choose a bounded data structure, compare service boundaries, and identify the signals that reveal a busy service.',
+    topics: ['event-loop', 'data-structures', 'system-patterns', 'observability'], xp: 80, coins: 10,
   },
   {
     id: 'network-dispatch', title: 'Follow the first packet', level: 'foundation',
@@ -42,8 +42,8 @@ const QUEST_CAMPAIGNS = [
   },
   {
     id: 'partition-boundary', title: 'Across the partition', level: 'advanced',
-    description: 'Choose service boundaries, inspect partition trade-offs, trace converging replicas, and test which versions a quorum can observe.',
-    topics: ['system-patterns', 'cap-theorem', 'eventual-consistency', 'replication-quorums'], xp: 150, coins: 25,
+    description: 'Inspect partition trade-offs, trace converging replicas, test which versions a quorum can observe, and repair drift with hash trees.',
+    topics: ['cap-theorem', 'eventual-consistency', 'replication-quorums', 'merkle-anti-entropy'], xp: 150, coins: 25,
   },
   {
     id: 'durable-record', title: 'Reconstruct the durable record', level: 'advanced',

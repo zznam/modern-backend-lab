@@ -16,7 +16,7 @@ test('search, combined filters, keyboard tabs, paths, and completion survive rel
   await page.locator('#topic-search').fill('no-such-lab');
   await expect(page.locator('#no-topics')).toBeVisible();
   await page.locator('#clear-filters').click();
-  await expect(page.locator('.nav-item:visible')).toHaveCount(46);
+  await expect(page.locator('.nav-item:visible')).toHaveCount(47);
   await page.locator('#learning-path').selectOption('distributed');
   await page.locator('#mark-complete').click();
   await expect(page.locator('#mark-complete')).toHaveAttribute('aria-pressed', 'true');
@@ -61,7 +61,7 @@ test('campaign and sprint advance through real runs with no repeat rewards', asy
   await page.getByRole('button', { name: '2-lab sprint', exact: true }).click();
   await openHub(page, 'campaigns');
   await page.locator('[data-qh-action="start-campaign"][data-value="runtime-foundations"]').click();
-  for (const id of ['event-loop', 'data-structures', 'observability']) {
+  for (const id of ['event-loop', 'data-structures', 'system-patterns', 'observability']) {
     await page.locator(`[data-exp="${id}"]`).click();
     await runLab(page, id);
   }

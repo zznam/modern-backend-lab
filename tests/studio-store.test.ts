@@ -14,8 +14,8 @@ function setup() {
 }
 
 describe('Study studio data and workflows',()=>{
-  it('covers all 46 current labs using real curriculum material',()=>{
-    const {ctx}=setup(); expect(Object.keys(ctx.catalog)).toHaveLength(46);
+  it('covers all 47 current labs using real curriculum material',()=>{
+    const {ctx}=setup(); expect(Object.keys(ctx.catalog)).toHaveLength(47);
     for(const t of Object.values(ctx.catalog) as any[]) {expect(t.title).toBeTruthy();expect(t.objective).toBeTruthy();expect(t.mechanics).toBeTruthy();}
     for(const q of ctx.quizzes) expect(ctx.catalog[q.topic]).toBeDefined();
   });
