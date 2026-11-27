@@ -66,6 +66,7 @@ A hands-on learning platform for exploring modern backend engineering, high-avai
 | | Replication Quorums & Read Repair | Trade read/write availability against quorum overlap and stale observations | [`replication-quorums.ts`](src/05-advanced-systems/replication-quorums.ts) |
 | | LSM Trees, Tombstones & Compaction | Trace flushes, versioned lookups, deletion markers, and compaction work | [`lsm-compaction.ts`](src/05-advanced-systems/lsm-compaction.ts) |
 | | Two-Phase Commit & Recovery | Inspect prepared participants, coordinator crashes, and durable decision replay | [`two-phase-commit.ts`](src/05-advanced-systems/two-phase-commit.ts) |
+| | Merkle Trees & Anti-Entropy | Locate divergent key ranges with hash comparisons and repair missed writes | [`merkle-anti-entropy.ts`](src/05-advanced-systems/merkle-anti-entropy.ts) |
 | | Event-Time Windows & Watermarks | Follow out-of-order events, late updates, cleanup, and side output | [`stream-watermarks.ts`](src/05-advanced-systems/stream-watermarks.ts) |
 
 ---
@@ -80,7 +81,7 @@ npm start
 ```
 Then visit: **`http://localhost:4000`**. No external services are required: the lab uses in-memory adapters when database URLs are absent.
 
-The dashboard includes **46 runnable topics**. Search by concept (for example, `raft`, `write skew`, or `watermarks`), filter by difficulty or completion, or choose a guided path: **Backend foundations**, **Distributed correctness**, **Production reliability**, or **Advanced data systems**. Every topic includes a learning objective, prerequisites, mechanics, production considerations, and a practice prompt. The ten advanced topics also include adjustable parameters, summary metrics, execution traces, and primary references.
+The dashboard includes **47 runnable topics**. Search by concept (for example, `raft`, `write skew`, or `watermarks`), filter by difficulty or completion, or choose a guided path: **Backend foundations**, **Distributed correctness**, **Production reliability**, or **Advanced data systems**. Every topic includes a learning objective, prerequisites, mechanics, production considerations, and a practice prompt. The eleven advanced topics also include adjustable parameters, summary metrics, execution traces, and primary references.
 
 The four new data-systems labs include **scenario presets** that populate the controls and explain what to look for before you run. Run an advanced lab twice to compare the previous and current parameters and metrics. Comparisons keep successful runs for each topic in memory during the current page session; reloading clears them.
 
@@ -100,7 +101,7 @@ Open **Learning journey** in the header (or `/#journey`) for:
 - **Achievement showcase:** feature any earned badge at the top of your journey, replace it, or unpin it. Your selection survives reloads. If you undo the completion needed for that badge, it stays hidden until earned again. Section shortcuts let you jump to challenges, review, weekly missions, and achievements while keeping the journey URL.
 - **Skill tracks:** see explored and completed counts for foundations, applied engineering, and advanced systems. Continue at the first unfinished lab, with conflicting filters cleared, or revisit a completed track.
 - **Achievements:** ten milestones with earned/locked filters and visible requirements. New milestones reward a three-day best streak, a weekly claim, exploring all difficulty levels, and five advanced completions. Completion-based badges reflect current progress, including undo; historical streak and claim badges remain earned.
-- **Quest hub:** six tabs add [56 documented gamification features](docs/GAMIFICATION.md), with 12 campaigns covering all 46 labs, 12 knowledge checks, daily featured labs, focus sprints, eight claimable milestones, and seven cosmetic rewards. Personalize a profile, earn coins, organize favorites and a practice queue, rate confidence, write searchable reflections, and inspect mastery, weekly goals, and monthly activity. The lab toolbar opens the current topic's notebook and shows active campaign/sprint progress. Successful runs advance the queue; failed or abandoned requests never advance quests.
+- **Quest hub:** six tabs add [56 documented gamification features](docs/GAMIFICATION.md), with 12 campaigns covering all 47 labs, 12 knowledge checks, daily featured labs, focus sprints, eight claimable milestones, and seven cosmetic rewards. Personalize a profile, earn coins, organize favorites and a practice queue, rate confidence, write searchable reflections, and inspect mastery, weekly goals, and monthly activity. The lab toolbar opens the current topic's notebook and shows active campaign/sprint progress. Successful runs advance the queue; failed or abandoned requests never advance quests.
 
 Journey and quest progress share the existing browser-local learning record. Earlier completions automatically count toward XP; historical runs and dates are not invented. The original journey stores topic IDs, activity dates, preferences, and reward claims. Quest data also includes your optional alias, notes, confidence, queue, and cosmetics. No learning history or reflections are sent to a server. The separate Study studio stores successful experiment results locally when history capture is enabled. A blocked or full local store falls back to session-only progress. Date-based goals refresh when the tab regains focus and once a minute while visible.
 
@@ -148,6 +149,7 @@ npm run lab 20   # Replication Quorums & Read Repair
 npm run lab 21   # LSM Trees, Tombstones & Compaction
 npm run lab 22   # Two-Phase Commit & Coordinator Recovery
 npm run lab 23   # Event-Time Windows, Watermarks & Late Data
+npm run lab 24   # Merkle Tree Anti-Entropy Repair
 ```
 
 ### 3. Run the Automated Test Suite
@@ -162,7 +164,7 @@ Run the real browser E2E suite after installing Chromium once:
 npx playwright install chromium
 npm run test:e2e
 ```
-Playwright builds and starts an isolated compiled server on `127.0.0.1:4179`, then exercises all 46 labs and all 12 scenario presets through their UI and real HTTP API. Desktop and mobile flows cover filters, keyboard navigation, completion persistence, campaign and sprint rewards, quizzes, private notes, backup download/import, failure recovery, and narrow layouts. A browser WebSocket test checks the `/ws` upgrade, welcome message, JSON acknowledgement, and connection cleanup. Cancellation and timeout tests deliberately delay a response to verify that abandoned runs earn no progress and can be retried. External font requests are blocked so unavailable font services cannot break local tests. Each test gets fresh browser storage; database URLs are cleared for these simulator-based tests. The live PostgreSQL and Redis tests below validate real storage separately.
+Playwright builds and starts an isolated compiled server on `127.0.0.1:4179`, then exercises all 47 labs and all 15 scenario presets through their UI and real HTTP API. Desktop and mobile flows cover filters, keyboard navigation, completion persistence, campaign and sprint rewards, quizzes, private notes, backup download/import, failure recovery, and narrow layouts. A browser WebSocket test checks the `/ws` upgrade, welcome message, JSON acknowledgement, and connection cleanup. Cancellation and timeout tests deliberately delay a response to verify that abandoned runs earn no progress and can be retried. External font requests are blocked so unavailable font services cannot break local tests. Each test gets fresh browser storage; database URLs are cleared for these simulator-based tests. The live PostgreSQL and Redis tests below validate real storage separately.
 
 Use `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e` to test with installed Google Chrome, or `E2E_PORT=4180 npm run test:e2e` if the default port is occupied. The runner refuses to reuse an existing server. Run `npm run check && npm run test:e2e` for both validation gates. Inspect the HTML report with `npm run test:e2e:report`; failing tests retain screenshots and traces under `test-results/`. CI runs the same desktop/mobile Chromium suite and uploads its report.
 
@@ -276,7 +278,7 @@ In [`caching-engine.ts`](src/03-architecture-distributed/caching-strategies/cach
 
 ## API behavior and teaching boundaries
 
-- All 46 dashboard navigation items have runnable handlers. Results return after the experiment completes; there is no SSE stream. `/ws` is a separate echo demonstration.
+- All 47 dashboard navigation items have runnable handlers. Results return after the experiment completes; there is no SSE stream. `/ws` is a separate echo demonstration.
 - `POST /api/experiments/run` requires an `experimentId` string and optional object `params`. Numeric controls are checked on the server (up to 80,000 primes, 100 concurrent tasks, 5,000 requests/keys, or 100,000 serialization iterations). At most two experiments run concurrently; additional runs receive 429 and `Retry-After`.
 - `GET /api/v1/orders` accepts `limit` 1–100, a nonnegative `offset`, a valid `status`, or a base64 order-ID `cursor`. Cursor pages seek the first greater key even when filtering excludes the cursor row. The array simulation still pays for filtering; a real database needs an appropriate index.
 - `POST /api/v1/orders` requires a nonempty `customerName` (maximum 200 characters) and finite positive `amount`. An optional `Idempotency-Key` replays the original response for the same payload; changed payloads receive 422. The in-memory key cache expires after 60 seconds and does not coordinate replicas.

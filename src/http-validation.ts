@@ -45,6 +45,7 @@ export function experimentInput(body: unknown): { experimentId: string; params: 
     readQuorum: [1, 3], writeQuorum: [1, 3], failedReplicas: [0, 2],
     memtableLimit: [2, 6], compaction: [0, 1], crashPoint: [0, 2], rejectVote: [0, 1],
     watermarkLag: [0, 20], allowedLateness: [0, 20],
+    divergentKeys: [0, 8], treeDepth: [1, 4],
   };
   for (const [key, range] of Object.entries(bounds)) {
     if (params[key] !== undefined) integerInput(params[key], key, ...range);

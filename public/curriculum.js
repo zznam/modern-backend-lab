@@ -112,6 +112,23 @@ const ADVANCED_TOPICS = {
     challenge: 'Compare early finalization with late updates. Which arrivals change a previously emitted total? Why is allowed lateness different from delaying the watermark?',
     source: 'src/05-advanced-systems/stream-watermarks.ts', reference: ['Apache Flink: Windows and allowed lateness', 'https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/operators/windows/'],
   },
+  'merkle-anti-entropy': {
+    title: 'Merkle Trees & Anti-Entropy Repair',
+    desc: 'Compare two drifting replicas through a hash tree, descend only into mismatched ranges, and repair the missed writes without scanning every key.',
+    prerequisites: ['replication-quorums', 'data-structures'],
+    objective: 'Explain how a hash tree lets replicas find divergent key ranges with few comparisons, and what tree depth trades off.',
+    controlsHtml: numberControl('divergentKeys', 'Missed writes on replica B', 2, 0, 8) + numberControl('treeDepth', 'Tree depth (leaves = 2^depth)', 3, 1, 4),
+    getParams: () => ({ divergentKeys: readNumber('divergentKeys'), treeDepth: readNumber('treeDepth') }),
+    scenarios: [
+      { label: 'In sync', params: { divergentKeys: 0, treeDepth: 3 }, expectation: 'Predict one comparison: equal root hashes prove the replicas match, so no keys are exchanged.' },
+      { label: 'One missed write', params: { divergentKeys: 1, treeDepth: 4 }, expectation: 'Predict a single dirty leaf: only its two keys are exchanged out of 32.' },
+      { label: 'Shallow tree', params: { divergentKeys: 2, treeDepth: 1 }, expectation: 'Predict few comparisons but large leaf ranges: most keys are exchanged even though only two differ.' },
+    ],
+    architecture: '<h4>Hashes summarize key ranges</h4><p>Each replica partitions 32 keys into 2^depth leaf ranges. A leaf hashes its key:version pairs and each parent hashes its two children. Comparison starts at the root and descends only where hashes differ, so matching subtrees are skipped. Keys in differing leaves are exchanged and the higher version wins.</p>',
+    production: '<h4>Background repair complements read repair</h4><p>Dynamo-style stores run anti-entropy in the background so keys that are never read still converge. Production trees are rebuilt or maintained incrementally, compared per token range, and must respect tombstones and their grace period so deleted data is not resurrected. Deeper trees narrow transfers but cost memory and more round trips.</p>',
+    challenge: 'Run two missed writes at depth 1 and depth 4. Compare hash comparisons with keys exchanged. Why do production systems cap tree depth instead of hashing every key individually?',
+    source: 'src/05-advanced-systems/merkle-anti-entropy.ts', reference: ['Apache Cassandra: Repair', 'https://cassandra.apache.org/doc/latest/cassandra/managing/operating/repair.html'],
+  },
   'consensus-quorum': {
     title: 'Consensus, Quorum Loss & Log Repair',
     desc: 'Partition an old leader, attempt a majority election, and observe which writes commit and how conflicting logs recover.',
