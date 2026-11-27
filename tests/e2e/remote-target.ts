@@ -1,9 +1,9 @@
+import { isProductionDeploymentOrigin } from '../../scripts/production-origin.ts';
+
 export function protectionHeaders(baseURL: string): Record<string, string> {
   const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   if (!secret) return {};
-  const url = new URL(baseURL);
-  if (url.protocol !== 'https:' || url.port || url.origin !== baseURL
-    || !/^modern-backend(?:-lab)?-[a-z0-9]{9}-zznams-projects\.vercel\.app$/.test(url.hostname)) {
+  if (!isProductionDeploymentOrigin(baseURL)) {
     throw new Error('Protection credentials require this project\'s immutable HTTPS deployment origin.');
   }
   return { 'x-vercel-protection-bypass': secret };

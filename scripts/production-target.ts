@@ -1,5 +1,6 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { isProductionDeploymentOrigin } from './production-origin.ts';
 
 const projectId = 'prj_pNttLosL1ocNsfDPbDAn0MPTQoQq';
 const repository = 'zznam/modern-backend-lab';
@@ -38,12 +39,10 @@ export function productionTarget(event: DeploymentEvent, eventName: string) {
   if (!id || !/^dpl_[a-zA-Z0-9]+$/.test(id) || !sha || !/^[a-f0-9]{40}$/.test(sha)) {
     throw new Error('A Vercel deployment ID and full commit SHA are required.');
   }
-  const target = new URL(url || '');
-  if (target.protocol !== 'https:' || target.port || target.origin !== url
-    || !/^modern-backend(?:-lab)?-[a-z0-9]{9}-zznams-projects\.vercel\.app$/.test(target.hostname)) {
+  if (!url || !isProductionDeploymentOrigin(url)) {
     throw new Error('Expected this project\'s immutable HTTPS deployment origin.');
   }
-  return { id, url: target.origin, sha };
+  return { id, url, sha };
 }
 
 async function main() {
