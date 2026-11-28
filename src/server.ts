@@ -8,7 +8,7 @@
  * - Interactive Experiment Orchestrator
  */
 import express, { type ErrorRequestHandler } from 'express';
-import { experimentInput, InputError, queryInteger, stringInput } from './http-validation.js';
+import { experimentControls, experimentInput, InputError, queryInteger, stringInput } from './http-validation.js';
 import { LRUCache, RingBuffer, MinHeap, BloomFilter, TrieRouter } from './01-runtime-systems/data-structures/data-structures.js';
 import { OrderDatabase } from './02-api-security-db/rest-standards/rest-controller.js';
 import { AuthService } from './02-api-security-db/auth-security/auth-service.js';
@@ -202,6 +202,12 @@ app.post('/api/v1/orders', (req, res) => {
 // ========================================================
 // MASTER EXPERIMENTS EXECUTION DISPATCHER
 // ========================================================
+// Numeric control bounds the dispatcher enforces, so clients can validate before submitting.
+app.get('/api/experiments/controls', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.json({ params: experimentControls() });
+});
+
 app.post('/api/experiments/run', async (req, res) => {
   const { experimentId, params } = experimentInput(req.body);
   if (activeExperiments >= 2) {
