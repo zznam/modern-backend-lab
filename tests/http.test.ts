@@ -8,6 +8,7 @@ import { globalShutdownCoordinator } from '../src/04-devops-reliability/resilien
 import { CachingEngineLab } from '../src/03-architecture-distributed/caching-strategies/caching-engine.js';
 import { runReplicationLab } from '../src/05-advanced-systems/replication-quorums.js';
 import { runAntiEntropyLab } from '../src/05-advanced-systems/merkle-anti-entropy.js';
+import { runTcpCongestionLab } from '../src/05-advanced-systems/tcp-congestion.js';
 import { runLsmLab } from '../src/05-advanced-systems/lsm-compaction.js';
 import { runTwoPhaseCommitLab } from '../src/05-advanced-systems/two-phase-commit.js';
 import { runStreamWatermarkLab } from '../src/05-advanced-systems/stream-watermarks.js';
@@ -116,6 +117,8 @@ describe('Dashboard → HTTP → labs', () => {
     ['stream-watermarks', { watermarkLag: 20, allowedLateness: 20 }, () => runStreamWatermarkLab(20, 20)],
     ['merkle-anti-entropy', { divergentKeys: 0, treeDepth: 1 }, () => runAntiEntropyLab(0, 1)],
     ['merkle-anti-entropy', { divergentKeys: 8, treeDepth: 4 }, () => runAntiEntropyLab(8, 4)],
+    ['tcp-congestion', { lossRound: 0, lossType: 0 }, () => runTcpCongestionLab(0, 0)],
+    ['tcp-congestion', { lossRound: 20, lossType: 1 }, () => runTcpCongestionLab(20, 1)],
   ] as const)('forwards every data-systems control for %s', async (experimentId, params, expected) => {
     const response = await post('/api/experiments/run', { experimentId, params });
     expect(response.status).toBe(200);
@@ -131,6 +134,8 @@ describe('Dashboard → HTTP → labs', () => {
     ['lsm-compaction', 'compaction', 0, 1],
     ['merkle-anti-entropy', 'divergentKeys', 0, 8],
     ['merkle-anti-entropy', 'treeDepth', 1, 4],
+    ['tcp-congestion', 'lossRound', 0, 20],
+    ['tcp-congestion', 'lossType', 0, 1],
     ['two-phase-commit', 'crashPoint', 0, 2],
     ['two-phase-commit', 'rejectVote', 0, 1],
     ['stream-watermarks', 'watermarkLag', 0, 20],
