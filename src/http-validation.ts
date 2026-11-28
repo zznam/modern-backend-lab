@@ -43,6 +43,7 @@ export const EXPERIMENT_PARAM_BOUNDS: Readonly<Record<string, readonly [number, 
   memtableLimit: [2, 6], compaction: [0, 1], crashPoint: [0, 2], rejectVote: [0, 1],
   watermarkLag: [0, 20], allowedLateness: [0, 20],
   divergentKeys: [0, 8], treeDepth: [1, 4],
+  lossRound: [0, 20], lossType: [0, 1],
 } satisfies Record<string, [number, number]>);
 
 /** Public description of the numeric controls, generated from the same table the validator uses. */

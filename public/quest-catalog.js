@@ -7,8 +7,8 @@ const QUEST_CAMPAIGNS = [
   },
   {
     id: 'network-dispatch', title: 'Follow the first packet', level: 'foundation',
-    description: 'Trace a name lookup, compare stream and datagram transport, and explain which protocol fits the conversation.',
-    topics: ['dns-resolution', 'raw-tcp-udp', 'protocols'], xp: 80, coins: 10,
+    description: 'Trace a name lookup, compare stream and datagram transport, explain which protocol fits the conversation, and watch TCP back off after loss.',
+    topics: ['dns-resolution', 'raw-tcp-udp', 'protocols', 'tcp-congestion'], xp: 80, coins: 10,
   },
   {
     id: 'latency-detectives', title: 'The latency investigation', level: 'intermediate',

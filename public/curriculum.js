@@ -129,6 +129,23 @@ const ADVANCED_TOPICS = {
     challenge: 'Run two missed writes at depth 1 and depth 4. Compare hash comparisons with keys exchanged. Why do production systems cap tree depth instead of hashing every key individually?',
     source: 'src/05-advanced-systems/merkle-anti-entropy.ts', reference: ['Apache Cassandra: Repair', 'https://cassandra.apache.org/doc/latest/cassandra/managing/operating/repair.html'],
   },
+  'tcp-congestion': {
+    title: 'TCP Congestion Control: Slow Start, AIMD & Recovery',
+    desc: 'Grow a congestion window round trip by round trip, inject one loss, and compare fast recovery with a retransmission timeout.',
+    prerequisites: ['raw-tcp-udp', 'protocols'],
+    objective: 'Explain how a TCP sender probes for bandwidth and why a timeout costs more throughput than duplicate ACKs.',
+    controlsHtml: numberControl('lossRound', 'Loss at round trip (0 = none)', 8, 0, 20) + '<div class="control-group"><label for="param-lossType">Loss signal</label><select id="param-lossType" class="control-input"><option value="0" selected>Three duplicate ACKs</option><option value="1">Retransmission timeout</option></select></div>',
+    getParams: () => ({ lossRound: readNumber('lossRound'), lossType: readNumber('lossType') }),
+    scenarios: [
+      { label: 'No loss', params: { lossRound: 0, lossType: 0 }, expectation: 'Predict exponential growth to ssthresh 32, then one extra segment per round trip.' },
+      { label: 'Duplicate ACKs', params: { lossRound: 8, lossType: 0 }, expectation: 'Predict the window halving once and continuing linearly from there.' },
+      { label: 'Timeout', params: { lossRound: 8, lossType: 1 }, expectation: 'Predict a collapse to one segment and a second slow start, delivering fewer segments overall.' },
+    ],
+    architecture: '<h4>Probe, back off, probe again</h4><p>The sender starts with one segment and doubles its window every round trip (slow start) until it reaches the slow-start threshold. Beyond it, additive increase adds one segment per round trip. A loss halves the threshold: three duplicate ACKs keep data flowing and resume at the halved window (fast recovery), while a timeout means the pipe drained, so the window restarts at one segment.</p>',
+    production: '<h4>Modern stacks refine the same loop</h4><p>Linux defaults to CUBIC, and BBR models bandwidth and round-trip time instead of reacting only to loss. SACK, pacing, delayed ACKs, receive windows and ECN all change the curve. Tune with real round-trip and loss measurements; this lab only shows the Reno-style shape.</p>',
+    challenge: 'Run the duplicate-ACK and timeout scenarios at round 8 and compare segments delivered. Why does a timeout reset to one segment when duplicate ACKs do not? Then move the loss to round 3 and explain the difference.',
+    source: 'src/05-advanced-systems/tcp-congestion.ts', reference: ['RFC 5681: TCP Congestion Control', 'https://www.rfc-editor.org/rfc/rfc5681'],
+  },
   'consensus-quorum': {
     title: 'Consensus, Quorum Loss & Log Repair',
     desc: 'Partition an old leader, attempt a majority election, and observe which writes commit and how conflicting logs recover.',

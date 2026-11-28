@@ -26,6 +26,7 @@ import { runSloLab } from './05-advanced-systems/slo-burn.js';
 import { runReplicationLab } from './05-advanced-systems/replication-quorums.js';
 import { runLsmLab } from './05-advanced-systems/lsm-compaction.js';
 import { runAntiEntropyLab } from './05-advanced-systems/merkle-anti-entropy.js';
+import { runTcpCongestionLab } from './05-advanced-systems/tcp-congestion.js';
 import { runTwoPhaseCommitLab } from './05-advanced-systems/two-phase-commit.js';
 import { runStreamWatermarkLab } from './05-advanced-systems/stream-watermarks.js';
 
@@ -67,10 +68,11 @@ Choose an experiment to run:
 22. [Advanced] Two-Phase Commit & Coordinator Recovery
 23. [Advanced] Event-Time Windows, Watermarks & Late Data
 24. [Advanced] Merkle Tree Anti-Entropy Repair
+25. [Advanced] TCP Congestion Control: Slow Start & AIMD
 
 q. Quit
 ----------------------------------------------------------------
-Enter selection (1-24 or q): `;
+Enter selection (1-25 or q): `;
 
 async function handleSelection(choice: string): Promise<void> {
   console.log('\n⏳ Running experiment...\n');
@@ -88,6 +90,7 @@ async function handleSelection(choice: string): Promise<void> {
     case '22': console.log(JSON.stringify(runTwoPhaseCommitLab(), null, 2)); break;
     case '23': console.log(JSON.stringify(runStreamWatermarkLab(), null, 2)); break;
     case '24': console.log(JSON.stringify(runAntiEntropyLab(), null, 2)); break;
+    case '25': console.log(JSON.stringify(runTcpCongestionLab(), null, 2)); break;
     case '1': {
       const res = await runEventLoopExperiment();
       console.log('📊 Event Loop Execution Trace:');
@@ -191,7 +194,7 @@ async function handleSelection(choice: string): Promise<void> {
       rl.close();
       return;
     default:
-      throw new Error('Invalid option. Please select 1-24 or q.');
+      throw new Error('Invalid option. Please select 1-25 or q.');
   }
 
   const duration = Math.round((performance.now() - start) * 10) / 10;
@@ -212,7 +215,7 @@ const directArg = process.argv[2];
 if (directArg) {
   const choice = resolveLabChoice(directArg);
   if (!choice) {
-    console.error(`Unknown lab "${directArg}". Use a menu number (1-24) or one of:\n  ${Object.keys(CLI_LAB_IDS).join('\n  ')}`);
+    console.error(`Unknown lab "${directArg}". Use a menu number (1-25) or one of:\n  ${Object.keys(CLI_LAB_IDS).join('\n  ')}`);
     process.exit(1);
   }
   handleSelection(choice).catch(err => {

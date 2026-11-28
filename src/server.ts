@@ -74,6 +74,7 @@ import { runSloLab } from './05-advanced-systems/slo-burn.js';
 import { runReplicationLab } from './05-advanced-systems/replication-quorums.js';
 import { runLsmLab } from './05-advanced-systems/lsm-compaction.js';
 import { runAntiEntropyLab } from './05-advanced-systems/merkle-anti-entropy.js';
+import { runTcpCongestionLab } from './05-advanced-systems/tcp-congestion.js';
 import { runTwoPhaseCommitLab } from './05-advanced-systems/two-phase-commit.js';
 import { runStreamWatermarkLab } from './05-advanced-systems/stream-watermarks.js';
 
@@ -248,6 +249,9 @@ app.post('/api/experiments/run', async (req, res) => {
         break;
       case 'merkle-anti-entropy':
         result = runAntiEntropyLab(params.divergentKeys, params.treeDepth);
+        break;
+      case 'tcp-congestion':
+        result = runTcpCongestionLab(params.lossRound, params.lossType);
         break;
       case 'two-phase-commit':
         result = runTwoPhaseCommitLab(params.crashPoint, params.rejectVote);
