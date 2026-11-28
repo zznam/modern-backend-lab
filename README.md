@@ -150,6 +150,7 @@ npm run lab 21   # LSM Trees, Tombstones & Compaction
 npm run lab 22   # Two-Phase Commit & Coordinator Recovery
 npm run lab 23   # Event-Time Windows, Watermarks & Late Data
 npm run lab 24   # Merkle Tree Anti-Entropy Repair
+npm run lab merkle-anti-entropy   # Dashboard lab ids work too (case-insensitive)
 ```
 
 ### 3. Run the Automated Test Suite
