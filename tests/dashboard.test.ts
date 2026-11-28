@@ -49,6 +49,23 @@ function load(hash = '', stored?: string, blockStorage = false) {
 afterEach(() => { windows.splice(0).forEach(win => win.close()); });
 
 describe('Dashboard learning interactions', () => {
+  it('runs the open experiment with Ctrl+Enter or Cmd+Enter, even from a parameter field', async () => {
+    const ui = load('#lsm-compaction');
+    const data = runLsmLab(4, 1);
+    ui.fetch.mockResolvedValue({ ok: true, json: async () => ({ experimentId: 'lsm-compaction', executionDurationMs: 2, data }) });
+    const field = ui.el('#param-memtableLimit') as unknown as { focus(): void; dispatchEvent(event: unknown): boolean };
+    field.focus();
+    field.dispatchEvent(new ui.win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    field.dispatchEvent(new ui.win.KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, shiftKey: true, bubbles: true }));
+    expect(ui.fetch).not.toHaveBeenCalled();
+    field.dispatchEvent(new ui.win.KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+    await vi.waitFor(() => expect(ui.el('#exec-status').textContent).toBe('Completed in 2ms'));
+    expect(JSON.parse(ui.fetch.mock.calls[0][1].body).experimentId).toBe('lsm-compaction');
+    ui.win.document.body.dispatchEvent(new ui.win.KeyboardEvent('keydown', { key: 'Enter', metaKey: true, bubbles: true }));
+    await vi.waitFor(() => expect(ui.fetch).toHaveBeenCalledTimes(2));
+    expect(ui.el('#run-btn').getAttribute('aria-keyshortcuts')).toContain('Control+Enter');
+  });
+
   it('searches all topics, combines filters, and recovers from an empty result', () => {
     const ui = load();
     expect(ui.shown()).toHaveLength(47);
