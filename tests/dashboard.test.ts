@@ -12,6 +12,7 @@ import { runAntiEntropyLab } from '../src/05-advanced-systems/merkle-anti-entrop
 import { runTcpCongestionLab } from '../src/05-advanced-systems/tcp-congestion.js';
 import { runHedgedRequestsLab } from '../src/05-advanced-systems/hedged-requests.js';
 import { runPoolQueueingLab } from '../src/05-advanced-systems/pool-queueing.js';
+import { runCacheEvictionLab } from '../src/05-advanced-systems/cache-eviction.js';
 import { runLsmLab } from '../src/05-advanced-systems/lsm-compaction.js';
 import { runTwoPhaseCommitLab } from '../src/05-advanced-systems/two-phase-commit.js';
 import { runStreamWatermarkLab } from '../src/05-advanced-systems/stream-watermarks.js';
@@ -71,16 +72,16 @@ describe('Dashboard learning interactions', () => {
 
   it('searches all topics, combines filters, and recovers from an empty result', () => {
     const ui = load();
-    expect(ui.shown()).toHaveLength(50);
+    expect(ui.shown()).toHaveLength(51);
     ui.change('#topic-level', 'advanced');
-    expect(ui.shown()).toHaveLength(14);
+    expect(ui.shown()).toHaveLength(15);
     ui.change('#topic-search', 'raft');
     expect(ui.shown()).toEqual(['consensus-quorum']);
     ui.change('#topic-search', 'no-such-concept');
     expect(ui.shown()).toEqual([]);
     expect(ui.el('#no-topics').hidden).toBe(false);
     ui.el('#clear-filters').click();
-    expect(ui.shown()).toHaveLength(50);
+    expect(ui.shown()).toHaveLength(51);
     expect(ui.el('#no-topics').hidden).toBe(true);
   });
 
@@ -107,7 +108,7 @@ describe('Dashboard learning interactions', () => {
 
   it('survives malformed state, invalid hashes, and unavailable local storage', () => {
     expect(load('#%E0%A4%A', '{bad-json').el('#exp-title').textContent).toContain('Event Loop');
-    expect(load('#unknown', '{"completed":["unknown"],"path":"__proto__"}').el('#progress-label').textContent).toBe('0 of 50 completed');
+    expect(load('#unknown', '{"completed":["unknown"],"path":"__proto__"}').el('#progress-label').textContent).toBe('0 of 51 completed');
     const blocked = load('#fencing-tokens', undefined, true);
     blocked.el('#mark-complete').click();
     expect(blocked.el('#mark-complete').getAttribute('aria-pressed')).toBe('true');
@@ -131,7 +132,7 @@ describe('Dashboard learning interactions', () => {
     ['backpressure', runBackpressureLab], ['slo-burn-rate', runSloLab],
     ['replication-quorums', runReplicationLab], ['lsm-compaction', runLsmLab],
     ['two-phase-commit', runTwoPhaseCommitLab], ['stream-watermarks', runStreamWatermarkLab],
-    ['merkle-anti-entropy', runAntiEntropyLab], ['tcp-congestion', runTcpCongestionLab], ['hedged-requests', runHedgedRequestsLab], ['pool-queueing', runPoolQueueingLab],
+    ['merkle-anti-entropy', runAntiEntropyLab], ['tcp-congestion', runTcpCongestionLab], ['hedged-requests', runHedgedRequestsLab], ['pool-queueing', runPoolQueueingLab], ['cache-eviction', runCacheEvictionLab],
   ] as const)('submits and renders the full %s result', async (id, run) => {
     const ui = load(`#${id}`);
     const data = run();
@@ -542,12 +543,12 @@ describe('Learning journey', () => {
       Object.keys(testJourney.topics).forEach(key => testJourney.recordRun(key));
     `);
     expect(ui.el('#daily-next').disabled).toBe(true);
-    expect(ui.el('#journey-total-xp').textContent).toBe('1000');
+    expect(ui.el('#journey-total-xp').textContent).toBe('1020');
     ui.win.eval('clock = new RealDate(2026, 2, 9, 12)');
     ui.win.dispatchEvent(new ui.win.Event('focus'));
     expect(ui.el('#daily-next').disabled).toBe(false);
     ui.win.eval("testJourney.recordRun('event-loop')");
-    expect(ui.el('#journey-total-xp').textContent).toBe('1000');
+    expect(ui.el('#journey-total-xp').textContent).toBe('1020');
     expect(ui.el('#daily-feedback').textContent).toBe('1 of 3 labs explored today');
     expect(ui.el('#journey-streak').textContent).toBe('2');
   });
@@ -566,9 +567,9 @@ describe('Learning journey', () => {
     const first = load();
     const all = first.shown();
     const ui = load('#journey', JSON.stringify({ completed: all, journey: { runs: all } }));
-    expect(ui.el('#journey-total-xp').textContent).toBe('3500');
+    expect(ui.el('#journey-total-xp').textContent).toBe('3570');
     expect(ui.el('#journey-level').textContent).toContain('Level 15');
-    expect(ui.el('#journey-level-progress').value).toBe(0);
+    expect(ui.el('#journey-level-progress').value).toBe(70);
     expect(ui.el('#badge-count').textContent).toBe('8 / 10');
     expect(ui.el('[data-quest="foundations"]').textContent).toBe('Revisit path →');
     ui.el('[data-badge-filter="locked"]').click();
@@ -646,7 +647,7 @@ describe('Weekly missions, skill tracks, and personal records', () => {
     ui.change('#topic-search', 'absent');
     ui.el('[data-mission="range"]').click();
     expect(ui.win.location.hash).toBe('#consensus-quorum');
-    expect(ui.shown()).toHaveLength(50);
+    expect(ui.shown()).toHaveLength(51);
     ui.win.eval("testJourney.recordRun('consensus-quorum')");
     expect(ui.el('[data-mission="range"]').textContent).toContain('Claim +100 XP');
     ui.el('[data-mission="range"]').click();
@@ -699,7 +700,7 @@ describe('Weekly missions, skill tracks, and personal records', () => {
     ui.el('[data-skill-topic="data-structures"]').click();
     expect(ui.win.location.hash).toBe('#data-structures');
     expect(ui.el('#learning-path').value).toBe('all');
-    expect(ui.shown()).toHaveLength(50);
+    expect(ui.shown()).toHaveLength(51);
     expect(ui.win.document.activeElement?.id).toBe('exp-title');
     ui.el('#mark-complete').click();
     expect(ui.el('.skill-card').textContent).toContain('2 / 9 labs complete');
@@ -734,7 +735,7 @@ describe('Scenario challenges, review practice, and achievement showcase', () =>
     ui.change('#topic-search', 'missing');
     ui.change('#topic-level', 'foundation');
     ui.el('[data-challenge="incident"]').click();
-    expect(ui.shown()).toHaveLength(50);
+    expect(ui.shown()).toHaveLength(51);
     expect(ui.win.location.hash).toBe('#rate-limiting');
     expect(state(ui).challenges.incident.steps).toEqual([]);
     expect(ui.el('#challenge-tracker').hidden).toBe(false);
@@ -828,7 +829,7 @@ describe('Scenario challenges, review practice, and achievement showcase', () =>
     expect(ui.win.document.activeElement?.getAttribute('data-review-topic')).toBe('event-loop');
     ui.change('#topic-search', 'absent');
     ui.el('[data-review-topic="event-loop"]').click();
-    expect(ui.shown()).toHaveLength(50);
+    expect(ui.shown()).toHaveLength(51);
     expect(ui.win.location.hash).toBe('#event-loop');
     record(ui, ['event-loop']);
     expect(ui.el('#review-count').textContent).toBe('1 lab due');
