@@ -2,6 +2,7 @@
  * Modern Backend Engineering Mastery Lab - Interactive CLI Runner
  * Run headless experiments, benchmarks, and diagnostic tools directly in terminal.
  */
+import { CLI_LAB_IDS, resolveLabChoice } from './cli-labs.js';
 import readline from 'node:readline';
 import { runEventLoopExperiment } from './01-runtime-systems/event-loop/event-loop-demo.js';
 import { compareSyncVsWorkerConcurrency } from './01-runtime-systems/worker-threads/worker-pool.js';
@@ -209,7 +210,12 @@ function promptUser(): void {
 // Check if run directly
 const directArg = process.argv[2];
 if (directArg) {
-  handleSelection(directArg).catch(err => {
+  const choice = resolveLabChoice(directArg);
+  if (!choice) {
+    console.error(`Unknown lab "${directArg}". Use a menu number (1-24) or one of:\n  ${Object.keys(CLI_LAB_IDS).join('\n  ')}`);
+    process.exit(1);
+  }
+  handleSelection(choice).catch(err => {
     console.error(`Experiment failed: ${err.message}`);
     process.exitCode = 1;
   }).finally(() => rl.close());
