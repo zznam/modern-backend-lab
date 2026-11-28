@@ -197,6 +197,23 @@ const ADVANCED_TOPICS = {
     challenge: 'Compare Uniform traffic and Typical skew at the same size. Why does skew matter more than size here? Then find the smallest cache that reaches 80% hits at skew 12.',
     source: 'src/05-advanced-systems/cache-eviction.ts', reference: ['Caffeine: Efficiency (W-TinyLFU)', 'https://github.com/ben-manes/caffeine/wiki/Efficiency'],
   },
+  'wal-durability': {
+    title: 'Write-Ahead Log Durability & Group Commit',
+    desc: 'Compare flushing every write, group commit and asynchronous commit by throughput, commit latency and acknowledged writes lost in a crash.',
+    prerequisites: ['acid-transactions', 'lsm-compaction'],
+    objective: 'Explain why fsync latency limits commit throughput, how group commit removes that limit safely, and what asynchronous commit gives up.',
+    controlsHtml: numberControl('writesPerSecond', 'Writes per second', 2000, 10, 5000) + numberControl('fsyncMs', 'fsync latency (ms)', 5, 1, 20) + '<div class="control-group"><label for="param-commitMode">Commit mode</label><select id="param-commitMode" class="control-input"><option value="0">fsync each write</option><option value="1" selected>Group commit</option><option value="2">Asynchronous commit</option></select></div>' + numberControl('windowMs', 'Flush window (ms)', 5, 1, 50),
+    getParams: () => ({ writesPerSecond: readNumber('writesPerSecond'), fsyncMs: readNumber('fsyncMs'), commitMode: readNumber('commitMode'), windowMs: readNumber('windowMs') }),
+    scenarios: [
+      { label: 'fsync each write', params: { writesPerSecond: 2000, fsyncMs: 5, commitMode: 0, windowMs: 5 }, expectation: 'Predict overload: a 5 ms fsync allows only 200 writes per second.' },
+      { label: 'Group commit', params: { writesPerSecond: 2000, fsyncMs: 5, commitMode: 1, windowMs: 5 }, expectation: 'Predict 200 fsyncs per second carrying about 10 writes each, with every acknowledged write durable.' },
+      { label: 'Asynchronous commit', params: { writesPerSecond: 2000, fsyncMs: 5, commitMode: 2, windowMs: 10 }, expectation: 'Predict near-zero latency and about 30 acknowledged writes lost if the machine crashes at the wrong moment.' },
+    ],
+    architecture: '<h4>Durability waits for the disk</h4><p>A write is durable only after the log is flushed with fsync. Flushing each write separately makes the disk the throughput limit. Group commit collects the writes that arrive within a short window and flushes them together, acknowledging each only after that shared fsync. Asynchronous commit acknowledges before flushing, so a crash discards writes the client already saw succeed.</p>',
+    production: '<h4>Tune the window, not the guarantee</h4><p>PostgreSQL exposes this as <code>commit_delay</code> and <code>synchronous_commit</code>; many databases group-commit automatically. Asynchronous commit can be acceptable for data you can recompute, never for payments. Battery-backed write caches change fsync latency entirely, so measure on the real disk.</p>',
+    challenge: 'Start with fsync each write and find the highest rate it handles. Switch to group commit and raise the window from 5 to 20 ms: what improves and what gets worse? When would asynchronous commit be acceptable?',
+    source: 'src/05-advanced-systems/wal-durability.ts', reference: ['PostgreSQL: WAL configuration (commit_delay)', 'https://www.postgresql.org/docs/current/wal-configuration.html'],
+  },
   'consensus-quorum': {
     title: 'Consensus, Quorum Loss & Log Repair',
     desc: 'Partition an old leader, attempt a majority election, and observe which writes commit and how conflicting logs recover.',

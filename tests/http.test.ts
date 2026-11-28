@@ -12,6 +12,7 @@ import { runTcpCongestionLab } from '../src/05-advanced-systems/tcp-congestion.j
 import { runHedgedRequestsLab } from '../src/05-advanced-systems/hedged-requests.js';
 import { runPoolQueueingLab } from '../src/05-advanced-systems/pool-queueing.js';
 import { runCacheEvictionLab } from '../src/05-advanced-systems/cache-eviction.js';
+import { runWalDurabilityLab } from '../src/05-advanced-systems/wal-durability.js';
 import { runLsmLab } from '../src/05-advanced-systems/lsm-compaction.js';
 import { runTwoPhaseCommitLab } from '../src/05-advanced-systems/two-phase-commit.js';
 import { runStreamWatermarkLab } from '../src/05-advanced-systems/stream-watermarks.js';
@@ -128,6 +129,8 @@ describe('Dashboard → HTTP → labs', () => {
     ['pool-queueing', { arrivalPerSecond: 1000, serviceMs: 500, poolSize: 128 }, () => runPoolQueueingLab(1000, 500, 128)],
     ['cache-eviction', { cacheSize: 1, skewTenths: 0 }, () => runCacheEvictionLab(1, 0)],
     ['cache-eviction', { cacheSize: 500, skewTenths: 20 }, () => runCacheEvictionLab(500, 20)],
+    ['wal-durability', { writesPerSecond: 10, fsyncMs: 1, commitMode: 0, windowMs: 1 }, () => runWalDurabilityLab(10, 1, 0, 1)],
+    ['wal-durability', { writesPerSecond: 5000, fsyncMs: 20, commitMode: 2, windowMs: 50 }, () => runWalDurabilityLab(5000, 20, 2, 50)],
   ] as const)('forwards every data-systems control for %s', async (experimentId, params, expected) => {
     const response = await post('/api/experiments/run', { experimentId, params });
     expect(response.status).toBe(200);
@@ -152,6 +155,10 @@ describe('Dashboard → HTTP → labs', () => {
     ['pool-queueing', 'poolSize', 1, 128],
     ['cache-eviction', 'cacheSize', 1, 500],
     ['cache-eviction', 'skewTenths', 0, 20],
+    ['wal-durability', 'writesPerSecond', 10, 5000],
+    ['wal-durability', 'fsyncMs', 1, 20],
+    ['wal-durability', 'commitMode', 0, 2],
+    ['wal-durability', 'windowMs', 1, 50],
     ['two-phase-commit', 'crashPoint', 0, 2],
     ['two-phase-commit', 'rejectVote', 0, 1],
     ['stream-watermarks', 'watermarkLag', 0, 20],

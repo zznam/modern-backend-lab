@@ -47,6 +47,7 @@ export const EXPERIMENT_PARAM_BOUNDS: Readonly<Record<string, readonly [number, 
   hedgeDelayMs: [0, 300], slowPercent: [0, 20],
   arrivalPerSecond: [1, 1000], serviceMs: [1, 500], poolSize: [1, 128],
   cacheSize: [1, 500], skewTenths: [0, 20],
+  writesPerSecond: [10, 5000], fsyncMs: [1, 20], commitMode: [0, 2], windowMs: [1, 50],
 } satisfies Record<string, [number, number]>);
 
 /** Public description of the numeric controls, generated from the same table the validator uses. */
