@@ -501,8 +501,17 @@ window.addEventListener('hashchange', () => {
   else if (!key) selectExperiment(currentExpKey);
 });
 
-// Global keyboard shortcuts: / or Cmd/Ctrl+K to focus search, Esc to clear
+// Global keyboard shortcuts: / or Cmd/Ctrl+K to focus search, Esc to clear,
+// Cmd/Ctrl+Enter to run the open experiment (also from its parameter fields).
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
+    const runVisible = runBtn.offsetParent !== null || !runBtn.closest('[hidden]');
+    if (runVisible && !runBtn.disabled && document.getElementById('journey-view').hidden) {
+      e.preventDefault();
+      runBtn.click();
+    }
+    return;
+  }
   if ((e.key === '/' || ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K'))) && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
     e.preventDefault();
     searchInput.focus();
