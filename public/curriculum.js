@@ -146,6 +146,23 @@ const ADVANCED_TOPICS = {
     challenge: 'Run the duplicate-ACK and timeout scenarios at round 8 and compare segments delivered. Why does a timeout reset to one segment when duplicate ACKs do not? Then move the loss to round 3 and explain the difference.',
     source: 'src/05-advanced-systems/tcp-congestion.ts', reference: ['RFC 5681: TCP Congestion Control', 'https://www.rfc-editor.org/rfc/rfc5681'],
   },
+  'hedged-requests': {
+    title: 'Tail Latency & Hedged Requests',
+    desc: 'Measure how rare slow replicas dominate p99, then send a delayed duplicate and weigh the shorter tail against the extra load.',
+    prerequisites: ['load-stress-benchmark', 'retry-backoff'],
+    objective: 'Explain why tail latency needs different tools than average latency, and how a hedge delay trades load for a shorter tail.',
+    controlsHtml: numberControl('hedgeDelayMs', 'Hedge after (ms, 0 = off)', 60, 0, 300, 10) + numberControl('slowPercent', 'Slow outliers (%)', 5, 0, 20),
+    getParams: () => ({ hedgeDelayMs: readNumber('hedgeDelayMs'), slowPercent: readNumber('slowPercent') }),
+    scenarios: [
+      { label: 'No hedging', params: { hedgeDelayMs: 0, slowPercent: 5 }, expectation: 'Predict a median near 27 ms but a p99 above 300 ms, set entirely by the 5% outliers.' },
+      { label: 'Hedge at p95', params: { hedgeDelayMs: 60, slowPercent: 5 }, expectation: 'Predict p99 dropping by roughly two thirds while only about 5% of requests are duplicated.' },
+      { label: 'Too eager', params: { hedgeDelayMs: 10, slowPercent: 5 }, expectation: 'Predict the shortest tail but duplicates for almost every request: twice the load on the replicas.' },
+    ],
+    architecture: '<h4>Duplicate only the stragglers</h4><p>Each request goes to one replica. If no reply arrives within the hedge delay, the same request is sent to a second replica and whichever answers first wins. Because outliers are rare and independent, the duplicate usually finishes quickly. Waiting until about the 95th percentile of normal latency keeps duplicates near 5%.</p>',
+    production: '<h4>Hedge only idempotent, cheap reads</h4><p>Cancel the losing request, cap duplicates with a budget, and derive the delay from live latency percentiles rather than a constant. Never hedge non-idempotent writes, and watch replica load: under real overload, extra requests lengthen queues and make every percentile worse.</p>',
+    challenge: 'Compare the three scenarios. Why does the median barely move while p99 drops? Then raise slow outliers to 20% and find the delay that keeps extra load under 15%.',
+    source: 'src/05-advanced-systems/hedged-requests.ts', reference: ['Dean & Barroso, The Tail at Scale (CACM 2013)', 'https://research.google/pubs/the-tail-at-scale/'],
+  },
   'consensus-quorum': {
     title: 'Consensus, Quorum Loss & Log Repair',
     desc: 'Partition an old leader, attempt a majority election, and observe which writes commit and how conflicting logs recover.',

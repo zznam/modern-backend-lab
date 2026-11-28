@@ -79,7 +79,7 @@ test('does not record failed or canceled runs and supports capture opt-out',asyn
 });
 
 test('uses reference filters and keyboard actions, creates cards from references and exports source code',async({page})=>{
-  await open(page,'library');await page.getByRole('combobox',{name:'Level',exact:true}).selectOption('advanced');await page.getByRole('button',{name:'Apply',exact:true}).click();await expect(page.locator('#studio-content .card')).toHaveCount(12);
+  await open(page,'library');await page.getByRole('combobox',{name:'Level',exact:true}).selectOption('advanced');await page.getByRole('button',{name:'Apply',exact:true}).click();await expect(page.locator('#studio-content .card')).toHaveCount(13);
   await page.locator('#studio-content .card').first().getByRole('button',{name:'Pin reference'}).click();await page.getByRole('combobox',{name:'Show',exact:true}).selectOption('pinned');await page.getByRole('button',{name:'Apply',exact:true}).click();await expect(page.locator('#studio-content .card')).toHaveCount(1);
   await page.getByRole('button',{name:'Create recall card'}).click();await page.getByRole('dialog').getByRole('button',{name:'Save record'}).click();
   await page.getByRole('button',{name:'Start research note'}).click();await page.getByRole('dialog').getByRole('button',{name:'Save record'}).click();

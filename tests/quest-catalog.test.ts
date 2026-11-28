@@ -17,9 +17,9 @@ const catalog = runInNewContext(`${source}\n({ topics: Object.keys({...TOPIC_GUI
 
 describe('Quest learning content contract', () => {
   it('offers distinct, navigable campaigns covering every current lab exactly once', () => {
-    expect(catalog.campaigns).toHaveLength(12);
-    expect(new Set(catalog.campaigns.map(campaign => campaign.id)).size).toBe(12);
-    expect(new Set(catalog.campaigns.map(campaign => campaign.title)).size).toBe(12);
+    expect(catalog.campaigns).toHaveLength(13);
+    expect(new Set(catalog.campaigns.map(campaign => campaign.id)).size).toBe(13);
+    expect(new Set(catalog.campaigns.map(campaign => campaign.title)).size).toBe(13);
     const routed = catalog.campaigns.flatMap(campaign => campaign.topics);
     expect([...routed].sort()).toEqual([...catalog.topics].sort());
     for (const campaign of catalog.campaigns) {
