@@ -12,8 +12,8 @@ const QUEST_CAMPAIGNS = [
   },
   {
     id: 'latency-detectives', title: 'The latency investigation', level: 'intermediate',
-    description: 'Investigate a slow service through CPU isolation, retained memory, operating-system limits, and measured tail latency.',
-    topics: ['worker-threads', 'memory-leak', 'os-fundamentals', 'load-stress-benchmark'], xp: 110, coins: 15,
+    description: 'Investigate a slow service through CPU isolation, retained memory, and operating-system limits.',
+    topics: ['worker-threads', 'memory-leak', 'os-fundamentals'], xp: 110, coins: 15,
   },
   {
     id: 'secure-boundary', title: 'Guard the service boundary', level: 'intermediate',
@@ -57,8 +57,13 @@ const QUEST_CAMPAIGNS = [
   },
   {
     id: 'streaming-operator', title: 'Operate the event stream', level: 'advanced',
-    description: 'Balance queue capacity and late arrivals, interpret error-budget consumption, and connect the findings to rollout and health concepts.',
-    topics: ['backpressure', 'stream-watermarks', 'slo-burn-rate', 'devops-k8s'], xp: 180, coins: 30,
+    description: 'Balance queue capacity and late arrivals, and connect the findings to rollout and health concepts.',
+    topics: ['backpressure', 'stream-watermarks', 'devops-k8s'], xp: 180, coins: 30,
+  },
+  {
+    id: 'tame-the-tail', title: 'Tame the tail', level: 'advanced',
+    description: 'Measure tail latency under load, read how fast the error budget burns, and cut p99 with hedged requests without overloading replicas.',
+    topics: ['load-stress-benchmark', 'slo-burn-rate', 'hedged-requests'], xp: 150, coins: 25,
   },
 ];
 
