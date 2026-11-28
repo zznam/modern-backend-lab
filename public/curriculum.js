@@ -163,6 +163,23 @@ const ADVANCED_TOPICS = {
     challenge: 'Compare the three scenarios. Why does the median barely move while p99 drops? Then raise slow outliers to 20% and find the delay that keeps extra load under 15%.',
     source: 'src/05-advanced-systems/hedged-requests.ts', reference: ['Dean & Barroso, The Tail at Scale (CACM 2013)', 'https://research.google/pubs/the-tail-at-scale/'],
   },
+  'pool-queueing': {
+    title: 'Queueing & Connection Pool Sizing',
+    desc: "Apply Little's law and Erlang C to a connection pool, then watch waiting time explode as utilization approaches 100%.",
+    prerequisites: ['db-tuning', 'load-stress-benchmark'],
+    objective: 'Size a pool from arrival rate and service time, and explain why a pool that is busy only 85% of the time can still add noticeable waits.',
+    controlsHtml: numberControl('arrivalPerSecond', 'Arrivals per second', 200, 1, 1000) + numberControl('serviceMs', 'Service time (ms)', 40, 1, 500) + numberControl('poolSize', 'Pool size (connections)', 10, 1, 128),
+    getParams: () => ({ arrivalPerSecond: readNumber('arrivalPerSecond'), serviceMs: readNumber('serviceMs'), poolSize: readNumber('poolSize') }),
+    scenarios: [
+      { label: 'Comfortable', params: { arrivalPerSecond: 200, serviceMs: 40, poolSize: 12 }, expectation: 'Predict about two thirds utilization and waits of a few milliseconds.' },
+      { label: 'Near the edge', params: { arrivalPerSecond: 200, serviceMs: 40, poolSize: 9 }, expectation: 'Predict about 89% utilization: most requests wait and the mean wait rivals the service time.' },
+      { label: 'Overloaded', params: { arrivalPerSecond: 200, serviceMs: 40, poolSize: 7 }, expectation: 'Predict unbounded latency: eight connections are needed on average but only seven exist.' },
+    ],
+    architecture: "<h4>Average demand, then queueing</h4><p>Little's law gives the average number of busy connections: arrivals per second times service time. If the pool is smaller, the queue grows forever. If it is larger, the Erlang C formula gives the share of requests that find every connection busy and how long they wait on average. Waiting grows non-linearly: the last few percent of utilization cost the most.</p>",
+    production: '<h4>Pools protect the database too</h4><p>A larger pool reduces waiting only while the database has spare capacity; beyond that, extra connections add contention and slow every query. Measure real arrival rates and service-time percentiles, cap waits with timeouts, and prefer shorter queries over bigger pools.</p>',
+    challenge: 'Start from Near the edge and add one connection at a time. How much does each step reduce the mean wait? Then halve the service time instead and compare which change helps more.',
+    source: 'src/05-advanced-systems/pool-queueing.ts', reference: ["Little's law (MIT OpenCourseWare)", 'https://ocw.mit.edu/courses/15-070j-advanced-stochastic-processes-fall-2013/resources/mit15_070jf13_lec4/'],
+  },
   'consensus-quorum': {
     title: 'Consensus, Quorum Loss & Log Repair',
     desc: 'Partition an old leader, attempt a majority election, and observe which writes commit and how conflicting logs recover.',

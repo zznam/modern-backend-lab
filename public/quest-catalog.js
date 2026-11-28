@@ -12,8 +12,8 @@ const QUEST_CAMPAIGNS = [
   },
   {
     id: 'latency-detectives', title: 'The latency investigation', level: 'intermediate',
-    description: 'Investigate a slow service through CPU isolation, retained memory, and operating-system limits.',
-    topics: ['worker-threads', 'memory-leak', 'os-fundamentals'], xp: 110, coins: 15,
+    description: 'Investigate a slow service through CPU isolation, retained memory, operating-system limits, and an undersized connection pool.',
+    topics: ['worker-threads', 'memory-leak', 'os-fundamentals', 'pool-queueing'], xp: 110, coins: 15,
   },
   {
     id: 'secure-boundary', title: 'Guard the service boundary', level: 'intermediate',
