@@ -57,8 +57,8 @@ const QUEST_CAMPAIGNS = [
   },
   {
     id: 'streaming-operator', title: 'Operate the event stream', level: 'advanced',
-    description: 'Balance queue capacity and late arrivals, and connect the findings to rollout and health concepts.',
-    topics: ['backpressure', 'stream-watermarks', 'devops-k8s'], xp: 180, coins: 30,
+    description: 'Balance queue capacity and late arrivals, keep the log durable without stalling writers, and connect the findings to rollout and health concepts.',
+    topics: ['backpressure', 'stream-watermarks', 'wal-durability', 'devops-k8s'], xp: 180, coins: 30,
   },
   {
     id: 'tame-the-tail', title: 'Tame the tail', level: 'advanced',
