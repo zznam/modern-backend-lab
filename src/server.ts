@@ -76,6 +76,7 @@ import { runLsmLab } from './05-advanced-systems/lsm-compaction.js';
 import { runAntiEntropyLab } from './05-advanced-systems/merkle-anti-entropy.js';
 import { runTcpCongestionLab } from './05-advanced-systems/tcp-congestion.js';
 import { runHedgedRequestsLab } from './05-advanced-systems/hedged-requests.js';
+import { runPoolQueueingLab } from './05-advanced-systems/pool-queueing.js';
 import { runTwoPhaseCommitLab } from './05-advanced-systems/two-phase-commit.js';
 import { runStreamWatermarkLab } from './05-advanced-systems/stream-watermarks.js';
 
@@ -256,6 +257,9 @@ app.post('/api/experiments/run', async (req, res) => {
         break;
       case 'hedged-requests':
         result = runHedgedRequestsLab(params.hedgeDelayMs, params.slowPercent);
+        break;
+      case 'pool-queueing':
+        result = runPoolQueueingLab(params.arrivalPerSecond, params.serviceMs, params.poolSize);
         break;
       case 'two-phase-commit':
         result = runTwoPhaseCommitLab(params.crashPoint, params.rejectVote);

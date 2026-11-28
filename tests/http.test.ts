@@ -10,6 +10,7 @@ import { runReplicationLab } from '../src/05-advanced-systems/replication-quorum
 import { runAntiEntropyLab } from '../src/05-advanced-systems/merkle-anti-entropy.js';
 import { runTcpCongestionLab } from '../src/05-advanced-systems/tcp-congestion.js';
 import { runHedgedRequestsLab } from '../src/05-advanced-systems/hedged-requests.js';
+import { runPoolQueueingLab } from '../src/05-advanced-systems/pool-queueing.js';
 import { runLsmLab } from '../src/05-advanced-systems/lsm-compaction.js';
 import { runTwoPhaseCommitLab } from '../src/05-advanced-systems/two-phase-commit.js';
 import { runStreamWatermarkLab } from '../src/05-advanced-systems/stream-watermarks.js';
@@ -122,6 +123,8 @@ describe('Dashboard → HTTP → labs', () => {
     ['tcp-congestion', { lossRound: 20, lossType: 1 }, () => runTcpCongestionLab(20, 1)],
     ['hedged-requests', { hedgeDelayMs: 0, slowPercent: 0 }, () => runHedgedRequestsLab(0, 0)],
     ['hedged-requests', { hedgeDelayMs: 300, slowPercent: 20 }, () => runHedgedRequestsLab(300, 20)],
+    ['pool-queueing', { arrivalPerSecond: 1, serviceMs: 1, poolSize: 1 }, () => runPoolQueueingLab(1, 1, 1)],
+    ['pool-queueing', { arrivalPerSecond: 1000, serviceMs: 500, poolSize: 128 }, () => runPoolQueueingLab(1000, 500, 128)],
   ] as const)('forwards every data-systems control for %s', async (experimentId, params, expected) => {
     const response = await post('/api/experiments/run', { experimentId, params });
     expect(response.status).toBe(200);
@@ -141,6 +144,9 @@ describe('Dashboard → HTTP → labs', () => {
     ['tcp-congestion', 'lossType', 0, 1],
     ['hedged-requests', 'hedgeDelayMs', 0, 300],
     ['hedged-requests', 'slowPercent', 0, 20],
+    ['pool-queueing', 'arrivalPerSecond', 1, 1000],
+    ['pool-queueing', 'serviceMs', 1, 500],
+    ['pool-queueing', 'poolSize', 1, 128],
     ['two-phase-commit', 'crashPoint', 0, 2],
     ['two-phase-commit', 'rejectVote', 0, 1],
     ['stream-watermarks', 'watermarkLag', 0, 20],
