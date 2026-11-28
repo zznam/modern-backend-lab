@@ -28,6 +28,23 @@ function post(path: string, body: unknown, headers = {}) {
   return fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
 }
 
+describe('Experiment control discovery', () => {
+  it('publishes exactly the bounds the run endpoint enforces', async () => {
+    const response = await fetch(`${base}/api/experiments/controls`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toContain('max-age=300');
+    const { params } = await response.json() as { params: Record<string, { type: string; min: number; max: number }> };
+    expect(params.readQuorum).toEqual({ type: 'integer', min: 1, max: 3 });
+    expect(params.treeDepth).toEqual({ type: 'integer', min: 1, max: 4 });
+    for (const [name, { min, max }] of Object.entries({ divergentKeys: params.divergentKeys, memtableLimit: params.memtableLimit })) {
+      const experimentId = name === 'divergentKeys' ? 'merkle-anti-entropy' : 'lsm-compaction';
+      expect((await post('/api/experiments/run', { experimentId, params: { [name]: max } })).status).toBe(200);
+      expect((await post('/api/experiments/run', { experimentId, params: { [name]: max + 1 } })).status).toBe(400);
+      expect((await post('/api/experiments/run', { experimentId, params: { [name]: min - 1 } })).status).toBe(400);
+    }
+  });
+});
+
 describe('Dashboard → HTTP → labs', () => {
   const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   const ids = [...html.matchAll(/data-exp="([^"]+)"/g)].map(match => match[1]);

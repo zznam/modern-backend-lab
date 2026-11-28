@@ -279,6 +279,7 @@ In [`caching-engine.ts`](src/03-architecture-distributed/caching-strategies/cach
 ## API behavior and teaching boundaries
 
 - All 47 dashboard navigation items have runnable handlers. Results return after the experiment completes; there is no SSE stream. `/ws` is a separate echo demonstration.
+- `GET /api/experiments/controls` lists every numeric experiment control as `{ type: 'integer', min, max }`, generated from the table the run endpoint validates against.
 - `POST /api/experiments/run` requires an `experimentId` string and optional object `params`. Numeric controls are checked on the server (up to 80,000 primes, 100 concurrent tasks, 5,000 requests/keys, or 100,000 serialization iterations). At most two experiments run concurrently; additional runs receive 429 and `Retry-After`.
 - `GET /api/v1/orders` accepts `limit` 1–100, a nonnegative `offset`, a valid `status`, or a base64 order-ID `cursor`. Cursor pages seek the first greater key even when filtering excludes the cursor row. The array simulation still pays for filtering; a real database needs an appropriate index.
 - `POST /api/v1/orders` requires a nonempty `customerName` (maximum 200 characters) and finite positive `amount`. An optional `Idempotency-Key` replays the original response for the same payload; changed payloads receive 422. The in-memory key cache expires after 60 seconds and does not coordinate replicas.

@@ -30,23 +30,33 @@ export function stringInput(value: unknown, name: string, max = 500): string {
   return value;
 }
 
+/** Inclusive integer bounds for every numeric experiment control, keyed by parameter name. */
+export const EXPERIMENT_PARAM_BOUNDS: Readonly<Record<string, readonly [number, number]>> = Object.freeze({
+  limit: [1, 80000], iterations: [1, 100000], concurrency: [1, 100],
+  cpuCores: [1, 256], keyCount: [1, 5000], totalRequests: [1, 5000],
+  mode: [0, 0o7777], createdMode: [0, 0o7777], umask: [0, 0o777],
+  clusterSize: [3, 9], availableNodes: [1, 8], pauseMs: [0, 20000],
+  projectionBatch: [0, 3], onCallDoctors: [2, 10],
+  producerRate: [1, 100], consumerRate: [1, 100], queueCapacity: [1, 100],
+  sloBasisPoints: [9000, 9999], longErrorBasisPoints: [0, 10000], shortErrorBasisPoints: [0, 10000],
+  readQuorum: [1, 3], writeQuorum: [1, 3], failedReplicas: [0, 2],
+  memtableLimit: [2, 6], compaction: [0, 1], crashPoint: [0, 2], rejectVote: [0, 1],
+  watermarkLag: [0, 20], allowedLateness: [0, 20],
+  divergentKeys: [0, 8], treeDepth: [1, 4],
+} satisfies Record<string, [number, number]>);
+
+/** Public description of the numeric controls, generated from the same table the validator uses. */
+export function experimentControls() {
+  return Object.fromEntries(
+    Object.entries(EXPERIMENT_PARAM_BOUNDS).map(([name, [min, max]]) => [name, { type: 'integer', min, max }]),
+  );
+}
+
 export function experimentInput(body: unknown): { experimentId: string; params: Record<string, any> } {
   const input = objectInput(body, 'Request body');
   const experimentId = stringInput(input.experimentId, 'experimentId', 80);
   const params = objectInput(input.params === undefined ? {} : input.params, 'params');
-  const bounds: Record<string, [number, number]> = {
-    limit: [1, 80000], iterations: [1, 100000], concurrency: [1, 100],
-    cpuCores: [1, 256], keyCount: [1, 5000], totalRequests: [1, 5000],
-    mode: [0, 0o7777], createdMode: [0, 0o7777], umask: [0, 0o777],
-    clusterSize: [3, 9], availableNodes: [1, 8], pauseMs: [0, 20000],
-    projectionBatch: [0, 3], onCallDoctors: [2, 10],
-    producerRate: [1, 100], consumerRate: [1, 100], queueCapacity: [1, 100],
-    sloBasisPoints: [9000, 9999], longErrorBasisPoints: [0, 10000], shortErrorBasisPoints: [0, 10000],
-    readQuorum: [1, 3], writeQuorum: [1, 3], failedReplicas: [0, 2],
-    memtableLimit: [2, 6], compaction: [0, 1], crashPoint: [0, 2], rejectVote: [0, 1],
-    watermarkLag: [0, 20], allowedLateness: [0, 20],
-    divergentKeys: [0, 8], treeDepth: [1, 4],
-  };
+  const bounds = EXPERIMENT_PARAM_BOUNDS;
   for (const [key, range] of Object.entries(bounds)) {
     if (params[key] !== undefined) integerInput(params[key], key, ...range);
   }
