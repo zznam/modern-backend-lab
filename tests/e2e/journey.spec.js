@@ -16,7 +16,7 @@ test('search, combined filters, keyboard tabs, paths, and completion survive rel
   await page.locator('#topic-search').fill('no-such-lab');
   await expect(page.locator('#no-topics')).toBeVisible();
   await page.locator('#clear-filters').click();
-  await expect(page.locator('.nav-item:visible')).toHaveCount(50);
+  await expect(page.locator('.nav-item:visible')).toHaveCount(51);
   await page.locator('#learning-path').selectOption('distributed');
   await page.locator('#mark-complete').click();
   await expect(page.locator('#mark-complete')).toHaveAttribute('aria-pressed', 'true');

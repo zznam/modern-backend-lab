@@ -62,8 +62,8 @@ const QUEST_CAMPAIGNS = [
   },
   {
     id: 'tame-the-tail', title: 'Tame the tail', level: 'advanced',
-    description: 'Measure tail latency under load, read how fast the error budget burns, and cut p99 with hedged requests without overloading replicas.',
-    topics: ['load-stress-benchmark', 'slo-burn-rate', 'hedged-requests'], xp: 150, coins: 25,
+    description: 'Measure tail latency under load, read how fast the error budget burns, cut p99 with hedged requests, and keep hot keys cached.',
+    topics: ['load-stress-benchmark', 'slo-burn-rate', 'hedged-requests', 'cache-eviction'], xp: 150, coins: 25,
   },
 ];
 

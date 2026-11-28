@@ -27,6 +27,7 @@ export const CLI_LAB_IDS: Readonly<Record<string, string>> = Object.freeze({
   'tcp-congestion': '25',
   'hedged-requests': '26',
   'pool-queueing': '27',
+  'cache-eviction': '28',
 });
 
 /**

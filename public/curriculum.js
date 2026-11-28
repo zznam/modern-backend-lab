@@ -180,6 +180,23 @@ const ADVANCED_TOPICS = {
     challenge: 'Start from Near the edge and add one connection at a time. How much does each step reduce the mean wait? Then halve the service time instead and compare which change helps more.',
     source: 'src/05-advanced-systems/pool-queueing.ts', reference: ["Little's law (MIT OpenCourseWare)", 'https://ocw.mit.edu/courses/15-070j-advanced-stochastic-processes-fall-2013/resources/mit15_070jf13_lec4/'],
   },
+  'cache-eviction': {
+    title: 'Cache Eviction Under Skewed Traffic',
+    desc: 'Replay a Zipf-distributed workload through LRU, LFU and FIFO caches and see how skew and size drive hit rate.',
+    prerequisites: ['data-structures', 'cache-stampede'],
+    objective: 'Explain why a cache holding a few percent of keys can serve most reads, and when frequency beats recency.',
+    controlsHtml: numberControl('cacheSize', 'Cache size (of 1,000 keys)', 50, 1, 500) + numberControl('skewTenths', 'Skew s × 10 (0 = uniform)', 10, 0, 20),
+    getParams: () => ({ cacheSize: readNumber('cacheSize'), skewTenths: readNumber('skewTenths') }),
+    scenarios: [
+      { label: 'Uniform traffic', params: { cacheSize: 50, skewTenths: 0 }, expectation: 'Predict about 5% hits for every policy: the cache holds 5% of keys and none is hotter than another.' },
+      { label: 'Typical skew', params: { cacheSize: 50, skewTenths: 10 }, expectation: 'Predict roughly half of reads served from 5% of keys, with LFU ahead of LRU and FIFO last.' },
+      { label: 'Bigger cache', params: { cacheSize: 200, skewTenths: 12 }, expectation: 'Predict 80%+ hits and the policies converging as the cache holds most of the popular keys.' },
+    ],
+    architecture: '<h4>Popularity is uneven</h4><p>Under a Zipf distribution a handful of keys receive most requests. LRU keeps recently used keys, LFU keeps frequently used keys, and FIFO simply evicts the oldest insertion, even if it is hot. All three replay the same seeded stream, so differences come from the policy alone.</p>',
+    production: '<h4>Real caches adapt and admit selectively</h4><p>Popularity shifts over time, which hurts pure LFU; modern caches combine recency and frequency (W-TinyLFU in Caffeine, LRU-K, ARC) and refuse to admit one-hit wonders. Measure hit rate per key prefix and watch tail latency: misses on hot keys cost the most.</p>',
+    challenge: 'Compare Uniform traffic and Typical skew at the same size. Why does skew matter more than size here? Then find the smallest cache that reaches 80% hits at skew 12.',
+    source: 'src/05-advanced-systems/cache-eviction.ts', reference: ['Caffeine: Efficiency (W-TinyLFU)', 'https://github.com/ben-manes/caffeine/wiki/Efficiency'],
+  },
   'consensus-quorum': {
     title: 'Consensus, Quorum Loss & Log Repair',
     desc: 'Partition an old leader, attempt a majority election, and observe which writes commit and how conflicting logs recover.',
